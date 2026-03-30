@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda Semanal 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── HEADER ─────────────────────────── -->
+    <header class="app-header">
+      <div class="header-brand">
+        <h1 class="brand-name">Agenda</h1>
+        <span class="brand-year">2026</span>
+      </div>
+
+      <nav class="header-nav" aria-label="Navegación de semana">
+        <button class="btn-nav" id="btn-prev" title="Semana anterior">&#8592;</button>
+        <div class="week-info">
+          <span class="week-range" id="week-range">—</span>
+          <span class="week-num" id="week-num">—</span>
+        </div>
+        <button class="btn-nav" id="btn-next" title="Semana siguiente">&#8594;</button>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn-today" id="btn-today">Hoy</button>
+        <button class="btn-remove-hours" id="btn-remove-hours" title="Quitar 1 hora">- Hora</button>
+        <button class="btn-add-hours" id="btn-add-hours" title="Agregar 1 hora al final">+ Hora</button>
+      </div>
+    </header>
+
+    <!-- ── CALENDAR ───────────────────────── -->
+    <main class="calendar-wrapper">
+      <div class="calendar-header-row" id="calendar-header" role="row">
+        <!-- Rendered by calendar.js -->
+      </div>
+      <div class="calendar-body" id="calendar-body" role="grid">
+        <!-- Rendered by calendar.js -->
+      </div>
+    </main>
+
+  </div><!-- /#app -->
+
+  <!-- ── EVENT MODAL ────────────────────── -->
+  <div class="modal-backdrop" id="modal-backdrop" hidden aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-heading">Nuevo Evento</h2>
+        <button class="modal-close" id="modal-close" aria-label="Cerrar modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field-group">
+          <label for="evt-title">Título <span class="required">*</span></label>
+          <input type="text" id="evt-title" placeholder="Nombre del evento…" maxlength="80" autocomplete="off">
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label for="evt-start">Inicio</label>
+            <input type="time" id="evt-start" step="900">
+          </div>
+          <div class="field-group">
+            <label for="evt-end">Fin</label>
+            <input type="time" id="evt-end" step="900">
+          </div>
+        </div>
+        
+        <div class="field-group">
+          <label for="evt-recurrence">Repetir</label>
+          <select id="evt-recurrence" class="recurrence-select">
+            <option value="none">No repetir</option>
+            <option value="daily">Diario</option>
+            <option value="weekly">Semanal</option>
+            <option value="monthly">Mensual</option>
+            <option value="yearly">Anual</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="evt-desc">Descripción</label>
+          <textarea id="evt-desc" rows="2" placeholder="Detalles opcionales…"></textarea>
+        </div>
+
+        <div class="field-group">
+          <label>Color</label>
+          <div class="color-palette" id="color-palette" role="group" aria-label="Seleccionar color"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-delete" id="btn-delete" hidden>Eliminar</button>
+        <div class="footer-actions">
+          <button class="btn-secondary" id="btn-cancel">Cancelar</button>
+          <button class="btn-primary" id="btn-save">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SCRIPTS (order matters) ────────── -->
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
