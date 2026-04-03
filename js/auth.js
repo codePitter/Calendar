@@ -42,6 +42,11 @@ window.CalApp.Auth = (function () {
         _user = null;
         _afterSignOut();
 
+      } else if (event === 'TOKEN_REFRESHED' && !session) {
+        // Token de refresco inválido — limpiar y volver al login
+        console.warn('[Auth] Token refresh fallido, cerrando sesión');
+        await _client.auth.signOut();
+
       } else if (event === 'PASSWORD_RECOVERY') {
         // Usuario llegó desde el email de reset → mostrar formulario de nueva contraseña
         _user = session?.user || null;
@@ -52,7 +57,16 @@ window.CalApp.Auth = (function () {
     });
 
     // Verificar sesión existente al cargar
-    const { data: { session } } = await _client.auth.getSession();
+    const { data: { session }, error: sessionError } = await _client.auth.getSession();
+
+    // Token de refresco inválido o vencido → limpiar localStorage y mostrar login
+    if (sessionError) {
+      console.warn('[Auth] Sesión inválida, limpiando token:', sessionError.message);
+      await _client.auth.signOut();
+      _showModal();
+      return;
+    }
+
     if (session?.user) {
       _user = session.user;
       // Si hay hash de recovery en la URL, el evento PASSWORD_RECOVERY ya dispara solo
