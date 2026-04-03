@@ -203,14 +203,6 @@ window.CalApp.Calendar = (function () {
     const isImportant = !!evt.important;
     const hasImage    = !!evt.imageUrl;
 
-    // ── DEBUG: log eventos con imagen ──
-    if (hasImage) {
-      const imgType = evt.imageUrl.startsWith('data:') ? 'data URL' : 'URL directa';
-      console.log(`[RENDER] Evento "${evt.title}" tiene imagen:`
-        + ` tipo=${imgType}, longitud=${evt.imageUrl.length}`
-        + (imgType === 'data URL' ? `, prefijo=${evt.imageUrl.substring(0,40)}` : `, url=${evt.imageUrl.substring(0,60)}`));
-    }
-
     const recurrenceIcon = isRecurring ? ' 🔄' : '';
 
     // Clases del evento
@@ -228,7 +220,7 @@ window.CalApp.Calendar = (function () {
       styleStr = [
         `top:${top}px`,
         `height:${height}px`,
-        `background-image:url("${escapeAttr(evt.imageUrl)}")`,
+        `background-image:url('${evt.imageUrl}')`,
         `background-size:cover`,
         `background-position:center`,
         `z-index:${zIndex}`,
