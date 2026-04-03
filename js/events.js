@@ -12,9 +12,37 @@ window.CalApp.Events = (function () {
   let _pendingHour   = null;
   let _selectedColor = CONFIG.COLORS[0];
   let _isImportant   = false;
-  let _selectedImageUrl  = null;   // data URL final (para guardar en evento)
-  let _selectedThumbUrl  = null;   // URL original del thumb (para resaltar en grid)
-  let _imgConvertPromise = null;   // Promise pendiente de conversión a data URL
+  let _selectedImageUrl  = null;   // data URL final
+  let _selectedThumbUrl  = null;   // URL del thumb (para resaltar en grid)
+  let _imgConvertPromise = null;   // Promise pendiente de conversión
+
+  const RECENT_IMG_KEY  = 'agenda2026_recent_images';
+  const RECENT_IMG_MAX  = 8;
+
+  /* ── Recent images helpers ──────────────────────────────── */
+
+  function loadRecentImages() {
+    try {
+      const raw = localStorage.getItem(RECENT_IMG_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  }
+
+  function saveRecentImages(recents) {
+    try {
+      localStorage.setItem(RECENT_IMG_KEY, JSON.stringify(recents));
+    } catch (e) {
+      console.warn('[RECENTS] Error guardando recientes:', e);
+    }
+  }
+
+  function addToRecentImages(thumbUrl, dataUrl) {
+    const recents = loadRecentImages().filter(r => r.thumbUrl !== thumbUrl);
+    recents.unshift({ thumbUrl, dataUrl });
+    if (recents.length > RECENT_IMG_MAX) recents.length = RECENT_IMG_MAX;
+    saveRecentImages(recents);
+    renderRecentImages();  // actualizar UI inmediatamente
+  }
 
   let $backdrop, $title, $inputTitle, $inputStart, $inputEnd,
       $inputDesc, $palette, $btnDelete, $btnSave, $recurrence,
@@ -106,6 +134,10 @@ window.CalApp.Events = (function () {
 
   function buildImagePicker(container) {
     container.innerHTML = `
+      <div class="img-recents-section" id="img-recents-section" style="display:none">
+        <div class="img-recents-label">🕐 Recientes</div>
+        <div class="img-recents-grid" id="img-recents-grid"></div>
+      </div>
       <div class="img-search-row">
         <input type="text" id="img-search-input"
                placeholder="Buscar: montañas, ciudad, flores…"
@@ -127,6 +159,9 @@ window.CalApp.Events = (function () {
         <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
       </div>
     `;
+
+    // Mostrar recientes al abrir
+    renderRecentImages();
 
     // Category pills
     container.querySelectorAll('.img-pill').forEach(pill => {
@@ -161,6 +196,51 @@ window.CalApp.Events = (function () {
     document.getElementById('img-clear-btn').addEventListener('click', clearImage);
   }
 
+  /* ── Render recent images ───────────────────────────────── */
+
+  function renderRecentImages() {
+    const section = document.getElementById('img-recents-section');
+    const grid    = document.getElementById('img-recents-grid');
+    if (!section || !grid) return;
+
+    const recents = loadRecentImages();
+    if (!recents.length) { section.style.display = 'none'; return; }
+
+    section.style.display = 'block';
+    grid.innerHTML = recents.map(({ thumbUrl, dataUrl }) => `
+      <button type="button"
+              class="img-thumb${_selectedThumbUrl === thumbUrl ? ' selected' : ''}"
+              data-url="${thumbUrl}"
+              data-dataurl-cached="1"
+              title="Imagen reciente">
+        <img src="${thumbUrl}" alt="Reciente" loading="lazy" crossorigin="anonymous"
+             onerror="this.closest('.img-thumb').style.display='none'">
+        <div class="img-thumb-check">✓</div>
+      </button>
+    `).join('');
+
+    // Click en reciente: usar data URL ya guardado (sin re-fetch)
+    grid.querySelectorAll('.img-thumb').forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        const recent = recents.find(r => r.thumbUrl === thumb.dataset.url);
+        if (!recent) return;
+        // Aplicar directamente sin fetch
+        _selectedThumbUrl  = recent.thumbUrl;
+        _selectedImageUrl  = recent.dataUrl;
+        _imgConvertPromise = null;
+
+        // Actualizar selección visual en TODOS los grids
+        document.querySelectorAll('.img-thumb').forEach(t =>
+          t.classList.toggle('selected', t.dataset.url === recent.thumbUrl));
+
+        const bar     = document.getElementById('img-selected-bar');
+        const barSpan = bar ? bar.querySelector('span') : null;
+        if (bar) bar.style.display = 'flex';
+        if (barSpan) barSpan.textContent = '🖼️ Imagen reciente seleccionada';
+      });
+    });
+  }
+
   function loadImages(query) {
     const grid = document.getElementById('img-grid');
     if (!grid) return;
@@ -171,10 +251,8 @@ window.CalApp.Events = (function () {
         <span>Buscando imágenes…</span>
       </div>`;
 
-    // picsum.photos: CORS abierto, sin redirect a CDN externo, sin API key
+    // picsum.photos: CORS abierto, sin redirect externo, sin API key
     const safeQuery = query.trim().replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-    console.log('[IMG] loadImages query:', query, '→ seed base:', safeQuery);
-
     const thumbs = Array.from({ length: 8 }, (_, i) => {
       const seed = `${safeQuery}-${i}-${_imgSeed % 9999}`;
       const url  = `https://picsum.photos/seed/${seed}/280/180`;
@@ -200,37 +278,27 @@ window.CalApp.Events = (function () {
     });
   }
 
+  /* ── selectImage: async + data URL + guarda en recientes ── */
+
   async function selectImage(url) {
     _selectedThumbUrl  = url;
-    _selectedImageUrl  = null;          // se seteará cuando resuelva la conversión
+    _selectedImageUrl  = null;
     _imgConvertPromise = null;
 
-    // Actualizar UI inmediatamente (sin esperar el fetch)
-    const grid = document.getElementById('img-grid');
-    if (grid) {
-      grid.querySelectorAll('.img-thumb').forEach(t =>
-        t.classList.toggle('selected', t.dataset.url === url)
-      );
-    }
+    // UI inmediata: marcar seleccionado + spinner en barra
+    document.querySelectorAll('.img-thumb').forEach(t =>
+      t.classList.toggle('selected', t.dataset.url === url));
+
     const bar     = document.getElementById('img-selected-bar');
     const barSpan = bar ? bar.querySelector('span') : null;
     if (bar) bar.style.display = 'flex';
     if (barSpan) barSpan.textContent = '⏳ Preparando imagen…';
 
-    console.log('[IMG] selectImage — iniciando fetch de:', url);
-
-    // Guardar la promise para que saveEvent pueda esperarla
     _imgConvertPromise = (async () => {
       try {
         const response = await fetch(url, { mode: 'cors' });
-        console.log('[IMG] fetch OK — status:', response.status,
-                    'content-type:', response.headers.get('content-type'));
-
-        const blob = await response.blob();
-        console.log('[IMG] blob recibido — tamaño:', (blob.size / 1024).toFixed(1), 'KB',
-                    'tipo:', blob.type);
-
-        const dataUrl = await new Promise((resolve, reject) => {
+        const blob     = await response.blob();
+        const dataUrl  = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
           reader.onerror   = reject;
@@ -238,16 +306,15 @@ window.CalApp.Events = (function () {
         });
 
         _selectedImageUrl = dataUrl;
-        console.log('[IMG] ✅ data URL listo — longitud total:', dataUrl.length,
-                    '— prefijo:', dataUrl.substring(0, 60));
-
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
 
+        // Guardar en recientes
+        addToRecentImages(url, dataUrl);
+
       } catch (err) {
-        console.error('[IMG] ❌ Error al convertir imagen:', err);
-        console.warn('[IMG] Usando URL directa como fallback:', url);
+        console.error('[IMG] Error convirtiendo imagen:', err);
         _selectedImageUrl = url;
-        if (barSpan) barSpan.textContent = '⚠️ Imagen (modo directo — puede no mostrarse)';
+        if (barSpan) barSpan.textContent = '⚠️ Imagen (modo directo)';
       }
     })();
 
@@ -259,8 +326,7 @@ window.CalApp.Events = (function () {
     _selectedThumbUrl  = null;
     _imgConvertPromise = null;
 
-    const grid = document.getElementById('img-grid');
-    if (grid) grid.querySelectorAll('.img-thumb').forEach(t => t.classList.remove('selected'));
+    document.querySelectorAll('.img-thumb').forEach(t => t.classList.remove('selected'));
 
     const bar = document.getElementById('img-selected-bar');
     if (bar) bar.style.display = 'none';
@@ -324,10 +390,14 @@ window.CalApp.Events = (function () {
     const searchInput = document.getElementById('img-search-input');
     if (searchInput) searchInput.value = '';
 
-    // Si el evento ya tenía imagen, mostrar barra + cambiar a tab imagen
+    // Actualizar sección de recientes
+    renderRecentImages();
+
+    // Si el evento ya tenía imagen, restaurar thumb URL y mostrar barra
     if (_selectedImageUrl) {
+      _selectedThumbUrl = null; // no conocemos el thumb URL original en edición
       const bar = document.getElementById('img-selected-bar');
-      if (bar) bar.style.display = 'flex';
+      if (bar) { bar.style.display = 'flex'; bar.querySelector('span').textContent = '🖼️ Imagen guardada en el evento'; }
       switchBgTab('imagen');
     } else {
       switchBgTab('color');
@@ -356,27 +426,14 @@ window.CalApp.Events = (function () {
       return;
     }
 
-    // ── Race condition fix: esperar conversión de imagen si está en curso ──
+    // Esperar conversión si está en curso (race condition fix)
     if (_imgConvertPromise) {
-      console.log('[SAVE] Imagen en conversión — esperando…');
-      $btnSave.disabled = true;
+      $btnSave.disabled    = true;
       $btnSave.textContent = 'Procesando…';
-      try {
-        await _imgConvertPromise;
-        console.log('[SAVE] Conversión terminada. imageUrl length:', _selectedImageUrl?.length ?? 0);
-      } catch (e) {
-        console.warn('[SAVE] La conversión falló pero continuamos:', e);
-      }
-      $btnSave.disabled = false;
+      try { await _imgConvertPromise; } catch (e) {}
+      $btnSave.disabled    = false;
       $btnSave.textContent = 'Guardar';
     }
-
-    // ── Log de estado antes de guardar ──
-    console.log('[SAVE] Estado al guardar:');
-    console.log('  · _selectedThumbUrl :', _selectedThumbUrl);
-    console.log('  · _selectedImageUrl :', _selectedImageUrl
-      ? `data URL (${(_selectedImageUrl.length / 1024).toFixed(1)} KB) — tipo: ${_selectedImageUrl.substring(5, 20)}`
-      : null);
 
     const recurrence = $recurrence.value;
     const event = {
@@ -390,10 +447,6 @@ window.CalApp.Events = (function () {
       important: _isImportant,
       imageUrl:  _selectedImageUrl || null,
     };
-
-    console.log('[SAVE] event.imageUrl guardado:', event.imageUrl
-      ? `✅ data URL (${(event.imageUrl.length / 1024).toFixed(1)} KB)`
-      : '❌ null — el fondo NO se mostrará');
 
     if (recurrence !== 'none') {
       event.recurrence   = recurrence;

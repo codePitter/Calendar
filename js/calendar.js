@@ -224,6 +224,8 @@ window.CalApp.Calendar = (function () {
         `background-size:cover`,
         `background-position:center`,
         `z-index:${zIndex}`,
+        `border:3px solid ${color}`,
+        `border-radius:var(--radius-event)`,
       ].join(';');
     } else {
       styleStr = [
@@ -234,10 +236,8 @@ window.CalApp.Calendar = (function () {
       ].join(';');
     }
 
-    // Overlay de color cuando hay imagen (da legibilidad)
-    const overlayHTML = hasImage
-      ? `<div class="cal-event-img-overlay" style="background:${color}cc;"></div>`
-      : '';
+    // Sin overlay: la imagen se ve limpia, el color se expresa en el borde
+    const overlayHTML = '';
 
     const titleAttr = escapeAttr(evt.title)
       + (evt.desc  ? ' — ' + escapeAttr(evt.desc) : '')
