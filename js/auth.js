@@ -560,13 +560,17 @@ window.CalApp.Auth = (function () {
     const el = document.getElementById('auth-modal-backdrop');
     if (el) {
       el.hidden = false;
+      el.style.display = 'flex';
       setTimeout(() => document.getElementById('auth-email')?.focus(), 80);
     }
   }
 
   function _hideModal() {
     const el = document.getElementById('auth-modal-backdrop');
-    if (el) el.hidden = true;
+    if (el) {
+      el.hidden = true;
+      el.style.display = 'none';
+    }
   }
 
   /* ── Loading state ───────────────────────────────────────── */
