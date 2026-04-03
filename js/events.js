@@ -52,7 +52,7 @@ window.CalApp.Events = (function () {
    * @param {number} quality   - calidad JPEG 0-1 (default 0.72)
    * @returns {Promise<string>} dataUrl comprimida
    */
-  function compressImage(dataUrl, maxW = 480, maxH = 360, quality = 0.72) {
+  function compressImage(dataUrl, maxW = 900, maxH = 900, quality = 0.88) {
     return new Promise(resolve => {
       const img = new Image();
       img.onload = () => {
@@ -60,7 +60,10 @@ window.CalApp.Events = (function () {
         const canvas = document.createElement('canvas');
         canvas.width  = Math.round(img.width  * scale);
         canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = () => resolve(dataUrl); // fallback: devolver original
@@ -622,7 +625,7 @@ window.CalApp.Events = (function () {
     const safeQuery = query.trim().replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
     const thumbs = Array.from({ length: 8 }, (_, i) => {
       const seed = `${safeQuery}-${i}-${_imgSeed % 9999}`;
-      const url  = `https://picsum.photos/seed/${seed}/280/180`;
+      const url  = `https://picsum.photos/seed/${seed}/600/400`;
       return { url };
     });
 

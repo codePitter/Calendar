@@ -396,6 +396,12 @@ textarea { resize: vertical; }
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  image-rendering: auto;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 /* Gradiente oscuro en la zona del título para legibilidad */
