@@ -495,7 +495,7 @@ window.CalApp.Events = (function () {
         _selectedImageUrl = compressed;
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
 
-        await addToRecentImages(img.objectUrl, compressed);
+        await addToRecentImages(compressed, compressed);
 
       } catch (err) {
         console.error('[Folder img]', err);
