@@ -918,6 +918,61 @@ textarea { resize: vertical; }
 
 .img-clear-btn:hover { background: #c7d2fe; }
 
+/* ── IMÁGENES LOCALES (img/) ─────────────────────────────── */
+.img-local-section {
+  margin-bottom: 0.6rem;
+}
+
+.img-local-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+
+.img-upload-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  border: 1px dashed var(--clr-border);
+  background: var(--clr-bg);
+  color: var(--clr-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.img-upload-label:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+  background: #f0f0ff;
+}
+
+.img-local-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+
+.img-local-empty {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--clr-muted);
+  padding: 0.4rem 0.2rem;
+  line-height: 1.5;
+}
+
+.img-local-empty code {
+  font-size: 0.68rem;
+  background: var(--clr-border);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
 /* ── IMÁGENES RECIENTES ───────────────────────────────────── */
 .img-recents-section {
   margin-bottom: 0.6rem;

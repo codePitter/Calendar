@@ -64,4 +64,18 @@ window.CalApp.CONFIG = Object.freeze({
   STORAGE_KEY_EVENTS:   'agenda2026_events',
   STORAGE_KEY_SETTINGS: 'agenda2026_settings',
   STORAGE_KEY_RECURRING: 'agenda2026_recurring',
+
+  /**
+   * Imágenes locales de la carpeta img/.
+   * Formato: { src: 'img/archivo.jpg', label: 'Nombre opcional' }
+   *   o simplemente un string: 'img/archivo.jpg'
+   *
+   * Ejemplo:
+   *   { src: 'img/playa.jpg',     label: '🏖️ Playa'     },
+   *   { src: 'img/montana.jpg',   label: '⛰️ Montaña'   },
+   *   { src: 'img/abstracto.png', label: '🎨 Abstracto' },
+   */
+  LOCAL_IMAGES: [
+    // { src: 'img/fondo1.jpg', label: 'Fondo 1' },
+  ],
 });
