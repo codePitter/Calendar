@@ -12,8 +12,9 @@ window.CalApp.Events = (function () {
   let _pendingHour   = null;
   let _selectedColor = CONFIG.COLORS[0];
   let _isImportant   = false;
-  let _selectedImageUrl = null;     // ← data URL final (para guardar en evento)
-  let _selectedThumbUrl = null;     // ← URL original del thumb (para resaltar en grid)
+  let _selectedImageUrl  = null;   // data URL final (para guardar en evento)
+  let _selectedThumbUrl  = null;   // URL original del thumb (para resaltar en grid)
+  let _imgConvertPromise = null;   // Promise pendiente de conversión a data URL
 
   let $backdrop, $title, $inputTitle, $inputStart, $inputEnd,
       $inputDesc, $palette, $btnDelete, $btnSave, $recurrence,
@@ -170,8 +171,10 @@ window.CalApp.Events = (function () {
         <span>Buscando imágenes…</span>
       </div>`;
 
-    // Generamos 8 URLs usando picsum.photos (CORS abierto, sin redirect externo)
+    // picsum.photos: CORS abierto, sin redirect a CDN externo, sin API key
     const safeQuery = query.trim().replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    console.log('[IMG] loadImages query:', query, '→ seed base:', safeQuery);
+
     const thumbs = Array.from({ length: 8 }, (_, i) => {
       const seed = `${safeQuery}-${i}-${_imgSeed % 9999}`;
       const url  = `https://picsum.photos/seed/${seed}/280/180`;
@@ -198,40 +201,63 @@ window.CalApp.Events = (function () {
   }
 
   async function selectImage(url) {
-    _selectedThumbUrl = url;
+    _selectedThumbUrl  = url;
+    _selectedImageUrl  = null;          // se seteará cuando resuelva la conversión
+    _imgConvertPromise = null;
 
-    // Convertir a data URL para evitar restricciones de hotlinking en CSS background-image
-    try {
-      const response = await fetch(url, { mode: 'cors' });
-      const blob     = await response.blob();
-      _selectedImageUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror   = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) {
-      // Fallback: usar URL directa (puede no funcionar como background en algunos navegadores)
-      console.warn('[Events] No se pudo convertir imagen a data URL, usando URL directa:', e);
-      _selectedImageUrl = url;
-    }
-
-    // Actualizar UI de thumbnails
+    // Actualizar UI inmediatamente (sin esperar el fetch)
     const grid = document.getElementById('img-grid');
     if (grid) {
       grid.querySelectorAll('.img-thumb').forEach(t =>
         t.classList.toggle('selected', t.dataset.url === url)
       );
     }
-
-    // Mostrar barra de "imagen seleccionada"
-    const bar = document.getElementById('img-selected-bar');
+    const bar     = document.getElementById('img-selected-bar');
+    const barSpan = bar ? bar.querySelector('span') : null;
     if (bar) bar.style.display = 'flex';
+    if (barSpan) barSpan.textContent = '⏳ Preparando imagen…';
+
+    console.log('[IMG] selectImage — iniciando fetch de:', url);
+
+    // Guardar la promise para que saveEvent pueda esperarla
+    _imgConvertPromise = (async () => {
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        console.log('[IMG] fetch OK — status:', response.status,
+                    'content-type:', response.headers.get('content-type'));
+
+        const blob = await response.blob();
+        console.log('[IMG] blob recibido — tamaño:', (blob.size / 1024).toFixed(1), 'KB',
+                    'tipo:', blob.type);
+
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror   = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        _selectedImageUrl = dataUrl;
+        console.log('[IMG] ✅ data URL listo — longitud total:', dataUrl.length,
+                    '— prefijo:', dataUrl.substring(0, 60));
+
+        if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
+
+      } catch (err) {
+        console.error('[IMG] ❌ Error al convertir imagen:', err);
+        console.warn('[IMG] Usando URL directa como fallback:', url);
+        _selectedImageUrl = url;
+        if (barSpan) barSpan.textContent = '⚠️ Imagen (modo directo — puede no mostrarse)';
+      }
+    })();
+
+    await _imgConvertPromise;
   }
 
   function clearImage() {
-    _selectedImageUrl = null;
-    _selectedThumbUrl = null;
+    _selectedImageUrl  = null;
+    _selectedThumbUrl  = null;
+    _imgConvertPromise = null;
 
     const grid = document.getElementById('img-grid');
     if (grid) grid.querySelectorAll('.img-thumb').forEach(t => t.classList.remove('selected'));
@@ -321,7 +347,7 @@ window.CalApp.Events = (function () {
 
   /* ── Save ───────────────────────────────────────────────── */
 
-  function saveEvent() {
+  async function saveEvent() {
     const title = $inputTitle.value.trim();
     if (!title) {
       $inputTitle.classList.add('error');
@@ -329,6 +355,28 @@ window.CalApp.Events = (function () {
       $inputTitle.addEventListener('input', () => $inputTitle.classList.remove('error'), { once: true });
       return;
     }
+
+    // ── Race condition fix: esperar conversión de imagen si está en curso ──
+    if (_imgConvertPromise) {
+      console.log('[SAVE] Imagen en conversión — esperando…');
+      $btnSave.disabled = true;
+      $btnSave.textContent = 'Procesando…';
+      try {
+        await _imgConvertPromise;
+        console.log('[SAVE] Conversión terminada. imageUrl length:', _selectedImageUrl?.length ?? 0);
+      } catch (e) {
+        console.warn('[SAVE] La conversión falló pero continuamos:', e);
+      }
+      $btnSave.disabled = false;
+      $btnSave.textContent = 'Guardar';
+    }
+
+    // ── Log de estado antes de guardar ──
+    console.log('[SAVE] Estado al guardar:');
+    console.log('  · _selectedThumbUrl :', _selectedThumbUrl);
+    console.log('  · _selectedImageUrl :', _selectedImageUrl
+      ? `data URL (${(_selectedImageUrl.length / 1024).toFixed(1)} KB) — tipo: ${_selectedImageUrl.substring(5, 20)}`
+      : null);
 
     const recurrence = $recurrence.value;
     const event = {
@@ -342,6 +390,10 @@ window.CalApp.Events = (function () {
       important: _isImportant,
       imageUrl:  _selectedImageUrl || null,
     };
+
+    console.log('[SAVE] event.imageUrl guardado:', event.imageUrl
+      ? `✅ data URL (${(event.imageUrl.length / 1024).toFixed(1)} KB)`
+      : '❌ null — el fondo NO se mostrará');
 
     if (recurrence !== 'none') {
       event.recurrence   = recurrence;
