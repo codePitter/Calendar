@@ -160,22 +160,27 @@ window.CalApp.Auth = (function () {
     _setLoading(true);
     _clearAllErrors();
 
-    let error;
+    try {
+      let error;
 
-    if (_mode === 'login') {
-      ({ error } = await _client.auth.signInWithPassword({ email, password }));
-    } else {
-      const { error: signUpError } = await _client.auth.signUp({ email, password });
-      error = signUpError;
-      if (!error) {
-        _showError('✅ ¡Cuenta creada! Revisá tu email para confirmar y luego iniciá sesión.', 'success', 'auth-error');
-        _setLoading(false);
-        return;
+      if (_mode === 'login') {
+        ({ error } = await _client.auth.signInWithPassword({ email, password }));
+      } else {
+        const { error: signUpError } = await _client.auth.signUp({ email, password });
+        error = signUpError;
+        if (!error) {
+          _showError('✅ ¡Cuenta creada! Revisá tu email para confirmar y luego iniciá sesión.', 'success', 'auth-error');
+          return;
+        }
       }
-    }
 
-    _setLoading(false);
-    if (error) _showError(_friendlyError(error.message), 'error', 'auth-error');
+      if (error) _showError(_friendlyError(error.message), 'error', 'auth-error');
+    } catch (err) {
+      console.error('[Auth] submit error:', err);
+      _showError('Error de conexión. Intentá nuevamente.', 'error', 'auth-error');
+    } finally {
+      _setLoading(false);
+    }
   }
 
   /* ── Recuperar contraseña (solicitud) ───────────────────── */
@@ -191,22 +196,25 @@ window.CalApp.Auth = (function () {
     _setLoading(true);
     _clearAllErrors();
 
-    // redirectTo debe apuntar exactamente a tu app para que Supabase
-    // redirija al usuario de vuelta y dispare el evento PASSWORD_RECOVERY
     const redirectTo = window.location.origin + window.location.pathname;
 
-    const { error } = await _client.auth.resetPasswordForEmail(email, { redirectTo });
+    try {
+      const { error } = await _client.auth.resetPasswordForEmail(email, { redirectTo });
 
-    _setLoading(false);
-
-    if (error) {
-      _showError(_friendlyError(error.message), 'error', 'auth-reset-error');
-    } else {
-      _showError(
-        '✅ ¡Listo! Si ese email está registrado, recibirás las instrucciones en breve.',
-        'success',
-        'auth-reset-error'
-      );
+      if (error) {
+        _showError(_friendlyError(error.message), 'error', 'auth-reset-error');
+      } else {
+        _showError(
+          '✅ ¡Listo! Si ese email está registrado, recibirás las instrucciones en breve.',
+          'success',
+          'auth-reset-error'
+        );
+      }
+    } catch (err) {
+      console.error('[Auth] requestReset error:', err);
+      _showError('Error de conexión. Intentá nuevamente.', 'error', 'auth-reset-error');
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -228,18 +236,26 @@ window.CalApp.Auth = (function () {
     _setLoading(true);
     _clearAllErrors();
 
-    const { error } = await _client.auth.updateUser({ password: p1 });
+    _setLoading(true);
+    _clearAllErrors();
 
-    _setLoading(false);
+    try {
+      const { error } = await _client.auth.updateUser({ password: p1 });
 
-    if (error) {
-      _showError(_friendlyError(error.message), 'error', 'auth-update-error');
-    } else {
-      _showError('✅ ¡Contraseña actualizada! Iniciando sesión…', 'success', 'auth-update-error');
-      _mode = 'login';
-      setTimeout(async () => {
-        if (_user) await _afterSignIn();
-      }, 1800);
+      if (error) {
+        _showError(_friendlyError(error.message), 'error', 'auth-update-error');
+      } else {
+        _showError('✅ ¡Contraseña actualizada! Iniciando sesión…', 'success', 'auth-update-error');
+        _mode = 'login';
+        setTimeout(async () => {
+          if (_user) await _afterSignIn();
+        }, 1800);
+      }
+    } catch (err) {
+      console.error('[Auth] updatePassword error:', err);
+      _showError('Error de conexión. Intentá nuevamente.', 'error', 'auth-update-error');
+    } finally {
+      _setLoading(false);
     }
   }
 
