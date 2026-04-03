@@ -28,8 +28,21 @@ window.CalApp.Auth = (function () {
     _buildModal();
     _buildUserBadge();
 
-    _client = window.supabase.createClient(cfg.url, cfg.anonKey);
-    window.CalApp._supabase = _client;
+    // Usar storageKey personalizada para evitar conflicto de locks entre pestañas
+    // y reusar el cliente si ya fue creado (evita múltiples instancias)
+    if (!window.CalApp._supabase) {
+      _client = window.supabase.createClient(cfg.url, cfg.anonKey, {
+        auth: {
+          storageKey: 'agenda2026-auth-token',
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+        }
+      });
+      window.CalApp._supabase = _client;
+    } else {
+      _client = window.CalApp._supabase;
+    }
 
     // Escuchar cambios de sesión
     _client.auth.onAuthStateChange(async (event, session) => {
