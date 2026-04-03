@@ -169,11 +169,11 @@ window.CalApp.Events = (function () {
         <span>Buscando imágenes…</span>
       </div>`;
 
-    // Generamos 8 URLs únicas usando 'sig' como semilla
-    // Unsplash Source redirige a imágenes según keywords + sig
+    // Generamos 8 URLs únicas usando loremflickr (soporte de keywords, gratuito)
     const thumbs = Array.from({ length: 8 }, (_, i) => {
       const sig = _imgSeed + i;
-      const url = `https://source.unsplash.com/featured/280x180/?${encodeURIComponent(query)}&sig=${sig}`;
+      const safeQuery = query.trim().replace(/\s+/g, ',');
+      const url = `https://loremflickr.com/280/180/${safeQuery}?lock=${sig}`;
       return { url, sig };
     });
 

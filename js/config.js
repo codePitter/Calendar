@@ -8,8 +8,8 @@ window.CalApp.CONFIG = Object.freeze({
   /** Hora de inicio del calendario */
   START_HOUR: 7,
 
-  /** Hora de fin por defecto (exclusiva: hasta las 23:00) */
-  DEFAULT_END_HOUR: 23,
+  /** Hora de fin por defecto (exclusiva: hasta las 00:00) */
+  DEFAULT_END_HOUR: 24,
 
   /** Altura en px de cada franja horaria de 1 hora — debe coincidir con --slot-h en CSS */
   SLOT_HEIGHT: 30,

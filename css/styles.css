@@ -30,7 +30,7 @@
   --font-brand:       'Inter', system-ui, -apple-system, sans-serif;
   --font-body:        'Inter', system-ui, -apple-system, sans-serif;
 
-  --header-h:         64px;
+  --header-h:         44px;
   --day-header-h:     72px;
   --time-gutter:      70px;
   --slot-h:           30px;
@@ -73,7 +73,7 @@ textarea { resize: vertical; }
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0 1.5rem;
+  padding: 0 1rem;
   height: var(--header-h);
   background: var(--clr-header-bg);
   color: var(--clr-header-text);
@@ -91,7 +91,7 @@ textarea { resize: vertical; }
 
 .brand-name {
   font-family: var(--font-brand);
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
@@ -113,8 +113,8 @@ textarea { resize: vertical; }
 }
 
 .btn-nav {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--clr-header-text);
