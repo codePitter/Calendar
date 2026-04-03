@@ -725,13 +725,19 @@ textarea { resize: vertical; }
 .color-dot {
   width: 28px; height: 28px;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: 2.5px solid transparent;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
 }
 
-.color-dot:hover { transform: scale(1.1); }
-.color-dot.active { border-color: var(--clr-text); transform: scale(1.05); }
+.color-dot:hover { transform: scale(1.12); }
+
+.color-dot.active {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--clr-surface), 0 0 0 4px var(--clr-text);
+  transform: scale(1.1);
+}
 
 /* ── IMAGE PICKER ────────────────────────────────────────── */
 .img-search-row {

@@ -37,6 +37,39 @@ window.CalApp.Events = (function () {
   let $ctxMenu  = null;
   let _ctxEvent = null;
 
+  /* ── Image compression ───────────────────────────────────── */
+
+  /**
+   * Comprime una dataUrl usando Canvas.
+   * @param {string} dataUrl   - imagen origen
+   * @param {number} maxW      - ancho máximo en px (default 480)
+   * @param {number} maxH      - alto máximo en px (default 360)
+   * @param {number} quality   - calidad JPEG 0-1 (default 0.72)
+   * @returns {Promise<string>} dataUrl comprimida
+   */
+  function compressImage(dataUrl, maxW = 480, maxH = 360, quality = 0.72) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const scale  = Math.min(1, maxW / img.width, maxH / img.height);
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(dataUrl); // fallback: devolver original
+      img.src = dataUrl;
+    });
+  }
+
+  /**
+   * Versión muy pequeña para thumbnails de recientes (≤ 120×90, jpeg 0.5)
+   */
+  function compressThumb(dataUrl) {
+    return compressImage(dataUrl, 120, 90, 0.5);
+  }
+
   /* ── Recent images helpers ──────────────────────────────── */
 
   function loadRecentImages() {
@@ -50,16 +83,25 @@ window.CalApp.Events = (function () {
     try {
       localStorage.setItem(RECENT_IMG_KEY, JSON.stringify(recents));
     } catch (e) {
-      console.warn('[RECENTS] Error guardando recientes:', e);
+      // Si aun así hay quota, intentar con menos recientes
+      try {
+        const fewer = recents.slice(0, 3);
+        localStorage.setItem(RECENT_IMG_KEY, JSON.stringify(fewer));
+      } catch { /* ignorar */ }
     }
   }
 
-  function addToRecentImages(thumbUrl, dataUrl) {
+  async function addToRecentImages(thumbUrl, dataUrl) {
+    // Comprimir thumb para no explotar localStorage
+    const compressedThumb = dataUrl.startsWith('data:')
+      ? await compressThumb(dataUrl)
+      : dataUrl; // si es URL externa, guardar como está
+
     const recents = loadRecentImages().filter(r => r.thumbUrl !== thumbUrl);
-    recents.unshift({ thumbUrl, dataUrl });
+    recents.unshift({ thumbUrl, dataUrl: compressedThumb });
     if (recents.length > RECENT_IMG_MAX) recents.length = RECENT_IMG_MAX;
     saveRecentImages(recents);
-    renderRecentImages();  // actualizar UI inmediatamente
+    renderRecentImages();
   }
 
   let $backdrop, $title, $inputTitle, $inputStart, $inputEnd,
@@ -92,17 +134,25 @@ window.CalApp.Events = (function () {
     $palette.addEventListener('click', e => {
       const dot = e.target.closest('.color-dot');
       if (!dot) return;
-      $palette.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-      dot.classList.add('active');
       _selectedColor = dot.dataset.color;
+      setActiveDot(_selectedColor); // sincroniza ambas paletas
     });
   }
 
   function setActiveDot(color) {
-    if (!$palette) return;
-    $palette.querySelectorAll('.color-dot').forEach(d => {
-      d.classList.toggle('active', d.dataset.color === color);
-    });
+    // Paleta del tab Color
+    if ($palette) {
+      $palette.querySelectorAll('.color-dot').forEach(d => {
+        d.classList.toggle('active', d.dataset.color === color);
+      });
+    }
+    // Paleta del tab Imagen (marco) — sincronizar siempre
+    const framePalette = document.getElementById('img-frame-palette');
+    if (framePalette) {
+      framePalette.querySelectorAll('.color-dot').forEach(d => {
+        d.classList.toggle('active', d.dataset.color === color);
+      });
+    }
   }
 
   /* ── Toggle importante ──────────────────────────────────── */
@@ -415,7 +465,7 @@ window.CalApp.Events = (function () {
       : '';
   }
 
-  /* ── Select image from folder (async → data URL) ────────── */
+  /* ── Select image from folder (async → compressed data URL) */
 
   async function selectFolderImage(img) {
     _selectedThumbUrl  = img.objectUrl;
@@ -429,22 +479,31 @@ window.CalApp.Events = (function () {
     const bar     = document.getElementById('img-selected-bar');
     const barSpan = bar?.querySelector('span');
     if (bar) bar.style.display = 'flex';
-    if (barSpan) barSpan.textContent = `⏳ Preparando ${img.name}…`;
+    if (barSpan) barSpan.textContent = `⏳ Comprimiendo ${img.name}…`;
 
     _imgConvertPromise = (async () => {
       try {
-        const dataUrl = await new Promise((res, rej) => {
+        // 1. Leer archivo como dataUrl
+        const rawDataUrl = await new Promise((res, rej) => {
           const reader = new FileReader();
           reader.onloadend = () => res(reader.result);
           reader.onerror   = rej;
           reader.readAsDataURL(img.file);
         });
-        _selectedImageUrl = dataUrl;
+
+        // 2. Comprimir antes de guardar (evita QuotaExceededError)
+        const compressed  = await compressImage(rawDataUrl);
+        _selectedImageUrl = compressed;
+
         if (barSpan) barSpan.textContent = `🖼️ ${img.name}`;
-        addToRecentImages(img.objectUrl, dataUrl);
+
+        // 3. Guardar thumb comprimido en recientes
+        await addToRecentImages(img.objectUrl, compressed);
+
       } catch (err) {
         console.error('[Folder img]', err);
-        _selectedImageUrl = img.objectUrl; // fallback: usar objectUrl (funciona en sesión)
+        // Fallback: usar objectUrl (solo dura la sesión, pero mejor que nada)
+        _selectedImageUrl = img.objectUrl;
         if (barSpan) barSpan.textContent = `🖼️ ${img.name} (sesión)`;
       }
     })();
@@ -552,14 +611,13 @@ window.CalApp.Events = (function () {
     });
   }
 
-  /* ── selectImage: async + data URL + guarda en recientes ── */
+  /* ── selectImage: async + compressed data URL + recientes ── */
 
   async function selectImage(url) {
     _selectedThumbUrl  = url;
     _selectedImageUrl  = null;
     _imgConvertPromise = null;
 
-    // UI inmediata: marcar seleccionado + spinner en barra
     document.querySelectorAll('.img-thumb').forEach(t =>
       t.classList.toggle('selected', t.dataset.url === url));
 
@@ -572,18 +630,19 @@ window.CalApp.Events = (function () {
       try {
         const response = await fetch(url, { mode: 'cors' });
         const blob     = await response.blob();
-        const dataUrl  = await new Promise((resolve, reject) => {
+        const rawDataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
           reader.onerror   = reject;
           reader.readAsDataURL(blob);
         });
 
-        _selectedImageUrl = dataUrl;
+        // Comprimir antes de guardar (evita QuotaExceededError)
+        const compressed  = await compressImage(rawDataUrl);
+        _selectedImageUrl = compressed;
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
 
-        // Guardar en recientes
-        addToRecentImages(url, dataUrl);
+        await addToRecentImages(url, compressed);
 
       } catch (err) {
         console.error('[IMG] Error convirtiendo imagen:', err);
