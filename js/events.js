@@ -10,9 +10,11 @@ window.CalApp.Events = (function () {
   let _pendingDate   = null;
   let _pendingHour   = null;
   let _selectedColor = CONFIG.COLORS[0];
+  let _isImportant   = false;   // ← nuevo estado
 
   let $backdrop, $title, $inputTitle, $inputStart, $inputEnd,
-      $inputDesc, $palette, $btnDelete, $btnSave, $recurrence, $endRecurrence;
+      $inputDesc, $palette, $btnDelete, $btnSave, $recurrence,
+      $endRecurrence, $btnImportant;
 
   function padTime(h, m = 0) {
     const hh = h % 24;
@@ -47,6 +49,27 @@ window.CalApp.Events = (function () {
     });
   }
 
+  /* ── Toggle importante ──────────────────────────────────── */
+
+  function setImportant(value) {
+    _isImportant = !!value;
+    if (!$btnImportant) return;
+    const star  = $btnImportant.querySelector('.toggle-star');
+    const label = $btnImportant.querySelector('.toggle-label');
+    if (_isImportant) {
+      $btnImportant.classList.add('is-active');
+      if (star)  star.textContent  = '★';
+      if (label) label.textContent = 'Importante';
+    } else {
+      $btnImportant.classList.remove('is-active');
+      if (star)  star.textContent  = '☆';
+      if (label) label.textContent = 'Marcar como importante';
+    }
+    $btnImportant.setAttribute('aria-pressed', String(_isImportant));
+  }
+
+  /* ── Recurrencia ────────────────────────────────────────── */
+
   function toggleEndRecurrenceField() {
     const recurrenceValue = $recurrence.value;
     const $endRecurrenceGroup = document.getElementById('end-recurrence-group');
@@ -55,36 +78,38 @@ window.CalApp.Events = (function () {
     }
   }
 
+  /* ── Modal open/close ───────────────────────────────────── */
+
   function openModal(dateStr, hour, event = null) {
     _currentEvent  = event;
     _pendingDate   = dateStr;
     _pendingHour   = hour;
 
     if (event) {
-      $title.textContent = event.recurrence && event.recurrence !== 'none' ? 'Editar Evento Recurrente' : 'Editar Evento';
+      $title.textContent = event.recurrence && event.recurrence !== 'none'
+        ? 'Editar Evento Recurrente'
+        : 'Editar Evento';
       $inputTitle.value = event.title || '';
       $inputStart.value = event.startTime || padTime(hour ?? CONFIG.START_HOUR);
-      $inputEnd.value = event.endTime || padTime((hour ?? CONFIG.START_HOUR) + 1);
-      $inputDesc.value = event.desc || '';
-      _selectedColor = event.color || CONFIG.COLORS[0];
+      $inputEnd.value   = event.endTime   || padTime((hour ?? CONFIG.START_HOUR) + 1);
+      $inputDesc.value  = event.desc || '';
+      _selectedColor    = event.color || CONFIG.COLORS[0];
       $recurrence.value = event.recurrence || 'none';
-      if ($endRecurrence) {
-        $endRecurrence.value = event.endRecurrence || '';
-      }
+      if ($endRecurrence) $endRecurrence.value = event.endRecurrence || '';
       $btnDelete.hidden = false;
+      setImportant(event.important);
     } else {
       $title.textContent = 'Nuevo Evento';
       const safeHour = Math.min(hour ?? CONFIG.START_HOUR, State.endHour - 1);
       $inputTitle.value = '';
       $inputStart.value = padTime(safeHour);
-      $inputEnd.value = padTime(Math.min(safeHour + 1, State.endHour));
-      $inputDesc.value = '';
-      _selectedColor = CONFIG.COLORS[0];
+      $inputEnd.value   = padTime(Math.min(safeHour + 1, State.endHour));
+      $inputDesc.value  = '';
+      _selectedColor    = CONFIG.COLORS[0];
       $recurrence.value = 'none';
-      if ($endRecurrence) {
-        $endRecurrence.value = '';
-      }
+      if ($endRecurrence) $endRecurrence.value = '';
       $btnDelete.hidden = true;
+      setImportant(false);
     }
 
     setActiveDot(_selectedColor);
@@ -101,6 +126,8 @@ window.CalApp.Events = (function () {
     _currentEvent = null;
   }
 
+  /* ── Save ───────────────────────────────────────────────── */
+
   function saveEvent() {
     const title = $inputTitle.value.trim();
     if (!title) {
@@ -112,18 +139,21 @@ window.CalApp.Events = (function () {
 
     const recurrence = $recurrence.value;
     const event = {
-      id: _currentEvent ? _currentEvent.id : generateId(),
-      dateKey: _currentEvent ? _currentEvent.dateKey : _pendingDate,
+      id:        _currentEvent ? _currentEvent.id : generateId(),
+      dateKey:   _currentEvent ? _currentEvent.dateKey : _pendingDate,
       title,
       startTime: $inputStart.value,
-      endTime: $inputEnd.value,
-      desc: $inputDesc.value.trim(),
-      color: _selectedColor,
+      endTime:   $inputEnd.value,
+      desc:      $inputDesc.value.trim(),
+      color:     _selectedColor,
+      important: _isImportant,   // ← guardamos el flag
     };
 
     if (recurrence !== 'none') {
-      event.recurrence = recurrence;
-      event.originalDate = _currentEvent ? (_currentEvent.originalDate || _currentEvent.dateKey) : _pendingDate;
+      event.recurrence   = recurrence;
+      event.originalDate = _currentEvent
+        ? (_currentEvent.originalDate || _currentEvent.dateKey)
+        : _pendingDate;
       if ($endRecurrence && $endRecurrence.value) {
         event.endRecurrence = $endRecurrence.value;
       }
@@ -139,6 +169,8 @@ window.CalApp.Events = (function () {
     window.CalApp.renderAndBind();
   }
 
+  /* ── Delete ─────────────────────────────────────────────── */
+
   function deleteEvent() {
     if (!_currentEvent) return;
     const confirmMsg = _currentEvent.recurrence && _currentEvent.recurrence !== 'none'
@@ -150,6 +182,8 @@ window.CalApp.Events = (function () {
     closeModal();
     window.CalApp.renderAndBind();
   }
+
+  /* ── Click en calendario ────────────────────────────────── */
 
   function handleBodyClick(e) {
     const evtEl = e.target.closest('.cal-event');
@@ -165,7 +199,6 @@ window.CalApp.Events = (function () {
         const weekEnd   = weekDays[6];
         const expanded  = expandRecurringEventsForRange(weekStart, weekEnd, State.recurringEvents);
         found = expanded.find(ev => ev.id === eventId && ev.dateKey === dateKey);
-
         if (found && found.originalEventId) {
           found = State.recurringEvents.find(ev => ev.id === found.originalEventId);
         }
@@ -179,12 +212,14 @@ window.CalApp.Events = (function () {
     if (!col) return;
 
     const dateKey = col.dataset.date;
-    const rect = col.getBoundingClientRect();
-    const relY  = e.clientY - rect.top;
-    const hour  = window.CalApp.Calendar.yToHour(relY, dateKey);
+    const rect    = col.getBoundingClientRect();
+    const relY    = e.clientY - rect.top;
+    const hour    = window.CalApp.Calendar.yToHour(relY, dateKey);
 
     openModal(dateKey, hour);
   }
+
+  /* ── Init ───────────────────────────────────────────────── */
 
   function init() {
     $backdrop   = document.getElementById('modal-backdrop');
@@ -198,6 +233,7 @@ window.CalApp.Events = (function () {
     $btnSave    = document.getElementById('btn-save');
     $recurrence = document.getElementById('evt-recurrence');
 
+    /* ── Campo "Hasta" de recurrencia ── */
     if (!document.getElementById('end-recurrence-group')) {
       const recurrenceGroup    = $recurrence.closest('.field-group');
       const endRecurrenceGroup = document.createElement('div');
@@ -210,9 +246,31 @@ window.CalApp.Events = (function () {
       `;
       recurrenceGroup.insertAdjacentElement('afterend', endRecurrenceGroup);
     }
-
     $endRecurrence = document.getElementById('evt-end-recurrence');
 
+    /* ── Toggle de importancia ── */
+    if (!document.getElementById('important-group')) {
+      const colorGroup     = document.getElementById('color-palette').closest('.field-group');
+      const importantGroup = document.createElement('div');
+      importantGroup.id        = 'important-group';
+      importantGroup.className = 'field-group';
+      importantGroup.innerHTML = `
+        <label>Prioridad</label>
+        <button type="button" id="btn-important-toggle"
+                class="btn-important-toggle" aria-pressed="false">
+          <span class="toggle-star">☆</span>
+          <span class="toggle-label">Marcar como importante</span>
+        </button>
+      `;
+      colorGroup.insertAdjacentElement('afterend', importantGroup);
+    }
+    $btnImportant = document.getElementById('btn-important-toggle');
+
+    $btnImportant.addEventListener('click', () => {
+      setImportant(!_isImportant);
+    });
+
+    /* ── Listeners generales ── */
     buildColorPalette();
 
     document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -238,13 +296,15 @@ window.CalApp.Events = (function () {
     document.getElementById('calendar-body').addEventListener('click', handleBodyClick);
   }
 
-  // ✅ FIX: parsear strings "YYYY-MM-DD" como hora local, no UTC
+  /* ── Helper: parsear date string como hora local ─────────── */
+
   function parseDateKey(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d);
   }
 
-  // Función auxiliar para expandir recurrentes (necesaria en handleBodyClick)
+  /* ── Helper: expandir recurrentes ───────────────────────── */
+
   function expandRecurringEventsForRange(startDate, endDate, recurringEvents) {
     const { CONFIG } = window.CalApp;
     const expanded = [];
@@ -261,12 +321,11 @@ window.CalApp.Events = (function () {
     }
 
     for (const event of recurringEvents) {
-      // ✅ FIX: usar parseDateKey en lugar de new Date(string) para evitar UTC offset
-      let currentDate = parseDateKey(event.originalDate);
+      let currentDate     = parseDateKey(event.originalDate);
       const endRecurrence = event.endRecurrence ? parseDateKey(event.endRecurrence) : null;
 
       if (event.recurrence === CONFIG.RECURRENCE_TYPES.YEARLY) {
-        let year = start.getFullYear();
+        let year         = start.getFullYear();
         const eventMonth = currentDate.getMonth();
         const eventDay   = currentDate.getDate();
 
@@ -274,11 +333,7 @@ window.CalApp.Events = (function () {
           const occurrenceDate = new Date(year, eventMonth, eventDay);
           if (occurrenceDate >= start && occurrenceDate <= end) {
             if (!endRecurrence || occurrenceDate <= endRecurrence) {
-              expanded.push({
-                ...event,
-                dateKey: toDateKey(occurrenceDate),
-                originalEventId: event.id
-              });
+              expanded.push({ ...event, dateKey: toDateKey(occurrenceDate), originalEventId: event.id });
             }
           }
           year++;
@@ -287,26 +342,18 @@ window.CalApp.Events = (function () {
         while (currentDate <= end) {
           if (currentDate >= start) {
             if (!endRecurrence || currentDate <= endRecurrence) {
-              expanded.push({
-                ...event,
-                dateKey: toDateKey(currentDate),
-                originalEventId: event.id
-              });
+              expanded.push({ ...event, dateKey: toDateKey(currentDate), originalEventId: event.id });
             }
           }
-
           switch (event.recurrence) {
             case CONFIG.RECURRENCE_TYPES.DAILY:
-              currentDate.setDate(currentDate.getDate() + 1);
-              break;
+              currentDate.setDate(currentDate.getDate() + 1); break;
             case CONFIG.RECURRENCE_TYPES.WEEKLY:
-              currentDate.setDate(currentDate.getDate() + 7);
-              break;
+              currentDate.setDate(currentDate.getDate() + 7); break;
             case CONFIG.RECURRENCE_TYPES.MONTHLY:
-              currentDate.setMonth(currentDate.getMonth() + 1);
-              break;
+              currentDate.setMonth(currentDate.getMonth() + 1); break;
             default:
-              currentDate = new Date(end.getTime() + 1); // salir del loop
+              currentDate = new Date(end.getTime() + 1);
           }
         }
       }

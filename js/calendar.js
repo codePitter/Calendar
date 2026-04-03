@@ -7,23 +7,12 @@ window.CalApp = window.CalApp || {};
 window.CalApp.Calendar = (function () {
   const { CONFIG, State } = window.CalApp;
 
-  /* ── Estado interno del módulo ────────────────────────── */
+  /* ── Estado interno del módulo ────────────────────────────── */
 
-  /**
-   * SlotMap de referencia (se usa para la columna de tiempo y compatibilidad).
-   * Todas las horas tienen la misma altura SLOT_HEIGHT.
-   * @type {Array<{hour:number, height:number, top:number}>}
-   */
   let _referenceSlotMap = [];
 
-  /* ── SlotMap ──────────────────────────────────────────── */
+  /* ── SlotMap ──────────────────────────────────────────────── */
 
-  /**
-   * Construye el mapa de alturas de slots.
-   * AHORA todas las horas tienen la misma altura SLOT_HEIGHT.
-   *
-   * @returns {Array<{hour:number, height:number, top:number}>}
-   */
   function buildSlotMap() {
     const { START_HOUR, SLOT_HEIGHT } = CONFIG;
     const endHour  = State.endHour;
@@ -38,20 +27,11 @@ window.CalApp.Calendar = (function () {
     return slots;
   }
 
-  /**
-   * Convierte un tiempo (h, m) a píxeles dentro de la columna.
-   *
-   * @param {number} h - Hora (puede superar el último slot)
-   * @param {number} m - Minutos (0–59)
-   * @param {Array}  slotMap
-   * @returns {number} Posición Y en píxeles
-   */
   function timeToY(h, m, slotMap) {
     if (!slotMap.length) return 0;
 
     const last = slotMap[slotMap.length - 1];
 
-    // Pasada la última hora → borde inferior de la columna
     if (h > last.hour) return last.top + last.height;
 
     const slot = slotMap.find(s => s.hour === h);
@@ -60,15 +40,8 @@ window.CalApp.Calendar = (function () {
     return slot.top + (m / 60) * slot.height;
   }
 
-  /* ── API pública: yToHour ─────────────────────────────── */
+  /* ── API pública: yToHour ─────────────────────────────────── */
 
-  /**
-   * Convierte una posición Y en píxeles a la hora entera correspondiente.
-   *
-   * @param {number} y - Posición Y en píxeles
-   * @param {string} dateKey - Clave del día (no se usa pero se mantiene por compatibilidad)
-   * @returns {number} Hora entera (START_HOUR … endHour-1)
-   */
   function yToHour(y, dateKey) {
     const slotMap = _referenceSlotMap;
     if (!slotMap.length) return CONFIG.START_HOUR;
@@ -80,7 +53,7 @@ window.CalApp.Calendar = (function () {
     return slotMap[slotMap.length - 1].hour;
   }
 
-  /* ── Utilidades privadas ──────────────────────────────── */
+  /* ── Utilidades privadas ──────────────────────────────────── */
 
   function getISOWeekNumber(date) {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -114,7 +87,7 @@ window.CalApp.Calendar = (function () {
     return String(str).replace(/"/g, '&quot;');
   }
 
-  /* ── Renderizado del encabezado ───────────────────────── */
+  /* ── Renderizado del encabezado ───────────────────────────── */
 
   function renderHeader() {
     const days      = State.getWeekDays();
@@ -157,23 +130,22 @@ window.CalApp.Calendar = (function () {
       `${corner}<div class="cal-days-header">${dayHeaders}</div>`;
   }
 
-  /* ── Renderizado del cuerpo ───────────────────────────── */
+  /* ── Renderizado del cuerpo ───────────────────────────────── */
 
   function renderBody() {
     const days = State.getWeekDays();
 
-    // Crear slotMap de referencia (todas las horas con misma altura)
     _referenceSlotMap = buildSlotMap();
 
-    /* Columna de horas ────────── */
+    /* Columna de horas */
     const timeColHTML = _referenceSlotMap.map(({ hour, height }) => {
       return `<div class="cal-time-label" style="height:${height}px">${padTime(hour)}</div>`;
     }).join('');
 
-    /* Columnas de días ───── */
+    /* Columnas de días */
     const dayCols = days.map((day, i) => {
       const dateKey = State.dateKey(day);
-      const totalH = _referenceSlotMap.reduce((sum, s) => sum + s.height, 0);
+      const totalH  = _referenceSlotMap.reduce((sum, s) => sum + s.height, 0);
 
       const colClass = [
         'cal-day-col',
@@ -182,18 +154,15 @@ window.CalApp.Calendar = (function () {
         i === 6      ? 'is-sun'   : '',
       ].filter(Boolean).join(' ');
 
-      // Líneas horarias
       const lines = _referenceSlotMap.map(({ height, top }) => {
         const topHalf = top + height / 2;
-        return `<div class="cal-hour-line"  style="top:${top}px"></div>
-                <div class="cal-half-line"  style="top:${topHalf}px"></div>`;
+        return `<div class="cal-hour-line" style="top:${top}px"></div>
+                <div class="cal-half-line" style="top:${topHalf}px"></div>`;
       }).join('');
 
-      // Eventos del día
       const dayEvents  = State.getEventsForDay(day);
       const eventsHTML = dayEvents.map(evt => renderEvent(evt, _referenceSlotMap)).join('');
 
-      // Línea de hora actual (solo hoy)
       const timeLine = isToday(day)
         ? `<div class="current-time-line" id="current-time-line"></div>`
         : '';
@@ -218,50 +187,50 @@ window.CalApp.Calendar = (function () {
     scrollToWorkingHours();
   }
 
-  /* ── Renderizado de un evento ─────────────────────────── */
+  /* ── Renderizado de un evento ─────────────────────────────── */
 
-  /**
-   * Genera el HTML de un bloque de evento.
-   *
-   * @param {Object} evt
-   * @param {Array}  slotMap
-   * @returns {string}
-   */
   function renderEvent(evt, slotMap) {
-  const [sh, sm] = evt.startTime.split(':').map(Number);
-  const [eh, em] = evt.endTime.split(':').map(Number);
+    const [sh, sm] = evt.startTime.split(':').map(Number);
+    const [eh, em] = evt.endTime.split(':').map(Number);
 
-  const top    = timeToY(sh, sm, slotMap);
-  const bottom = timeToY(eh, em, slotMap);
-  const height = Math.max(bottom - top, 20);
-  const color  = evt.color || CONFIG.COLORS[0];
+    const top    = timeToY(sh, sm, slotMap);
+    const bottom = timeToY(eh, em, slotMap);
+    const height = Math.max(bottom - top, 20);
+    const color  = evt.color || CONFIG.COLORS[0];
 
-  const showTime = height > 38;
-  const isRecurring = evt.recurrence && evt.recurrence !== 'none';
-  const recurrenceIcon = isRecurring ? ' 🔄' : '';
+    const showTime    = height > 38;
+    const isRecurring = evt.recurrence && evt.recurrence !== 'none';
+    const isImportant = !!evt.important;
 
-  return `
-    <div class="cal-event"
-         data-event-id="${escapeAttr(evt.id)}"
-         data-date-key="${escapeAttr(evt.dateKey)}"
-         style="top:${top}px;height:${height}px;background:${color};"
-         title="${escapeAttr(evt.title)}${evt.desc ? ' — ' + escapeAttr(evt.desc) : ''}${isRecurring ? ' (Evento recurrente)' : ''}">
-      <div class="cal-event-title">${escapeHTML(evt.title)}${recurrenceIcon}</div>
-      ${showTime ? `<div class="cal-event-time">${evt.startTime}–${evt.endTime}</div>` : ''}
-    </div>`;
-}
+    const recurrenceIcon = isRecurring ? ' 🔄' : '';
 
-  /* ── Línea de hora actual ─────────────────────────────── */
+    // Clases del evento
+    const classes = [
+      'cal-event',
+      isImportant ? 'is-important' : '',
+    ].filter(Boolean).join(' ');
+
+    // z-index explícito: importantes en primer plano sobre el resto
+    const zIndex  = isImportant ? 50 : 5;
+
+    return `
+      <div class="${classes}"
+           data-event-id="${escapeAttr(evt.id)}"
+           data-date-key="${escapeAttr(evt.dateKey)}"
+           style="top:${top}px;height:${height}px;background:${color};z-index:${zIndex};"
+           title="${escapeAttr(evt.title)}${evt.desc ? ' — ' + escapeAttr(evt.desc) : ''}${isRecurring ? ' (Evento recurrente)' : ''}${isImportant ? ' ⭐ Importante' : ''}">
+        <div class="cal-event-title">${escapeHTML(evt.title)}${recurrenceIcon}</div>
+        ${showTime ? `<div class="cal-event-time">${evt.startTime}–${evt.endTime}</div>` : ''}
+      </div>`;
+  }
+
+  /* ── Línea de hora actual ─────────────────────────────────── */
 
   function updateCurrentTimeLine() {
     const line = document.getElementById('current-time-line');
     if (!line) return;
 
-    const now    = new Date();
-    const today  = line.closest('.cal-day-col');
-    if (!today) return;
-
-    const dateKey = today.dataset.date;
+    const now     = new Date();
     const slotMap = _referenceSlotMap;
     const totalH  = slotMap.reduce((sum, s) => sum + s.height, 0);
 
@@ -275,7 +244,6 @@ window.CalApp.Calendar = (function () {
     }
   }
 
-  /** Scroll inicial al inicio del calendario */
   function scrollToWorkingHours() {
     const body = document.getElementById('calendar-body');
     if (!body || body.dataset.scrolled) return;
@@ -283,14 +251,13 @@ window.CalApp.Calendar = (function () {
     body.scrollTop = 0;
   }
 
-  /* ── API pública ──────────────────────────────────────── */
+  /* ── API pública ──────────────────────────────────────────── */
 
   function render() {
     renderHeader();
     renderBody();
   }
 
-  // Actualiza la línea de tiempo cada 30 segundos
   setInterval(updateCurrentTimeLine, 30_000);
 
   return { render, updateCurrentTimeLine, yToHour };

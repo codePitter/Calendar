@@ -338,18 +338,33 @@ textarea { resize: vertical; }
   background: var(--clr-surface);
   border-radius: var(--radius);
   border: 1px solid var(--clr-border);
-  overflow: hidden;
+  /* overflow: visible permite que el glow de eventos importantes se vea completo */
+  overflow: visible;
   cursor: pointer;
   transition: box-shadow 0.2s;
+  /* Clip a border-radius para que los eventos no sobresalgan del rounded corner */
+  clip-path: none;
+}
+
+/* Usamos un pseudo-elemento para el fondo con border-radius sin cortar el overflow */
+.cal-day-col::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cal-day-col.is-today::before {
+  background: var(--clr-col-today);
+  border-color: var(--clr-accent);
 }
 
 .cal-day-col:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.cal-day-col.is-today {
-  border-color: var(--clr-accent);
-  background: var(--clr-col-today);
 }
 
 /* Grid lines */
@@ -384,7 +399,7 @@ textarea { resize: vertical; }
   cursor: pointer;
   z-index: 5;
   box-shadow: var(--shadow-event);
-  transition: all 0.2s;
+  transition: filter 0.2s, transform 0.2s;
   min-height: 20px;
 }
 
@@ -408,6 +423,89 @@ textarea { resize: vertical; }
   color: rgba(255, 255, 255, 0.85);
   margin-top: 2px;
   white-space: nowrap;
+}
+
+/* ── EVENTO IMPORTANTE ───────────────────────────────────── */
+.cal-event.is-important {
+  z-index: 50 !important;
+  left: 2px;
+  right: 2px;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 0 3px rgba(255, 214, 0, 0.28),
+    0 6px 20px rgba(0, 0, 0, 0.32);
+  filter: brightness(1.08) saturate(1.12);
+}
+
+.cal-event.is-important:hover {
+  z-index: 60 !important;
+  filter: brightness(1.04) saturate(1.1);
+  transform: scaleX(1.015);
+}
+
+/* Estrella antes del título */
+.cal-event.is-important .cal-event-title::before {
+  content: '★ ';
+  color: rgba(255, 230, 80, 0.95);
+  font-size: 0.65rem;
+}
+
+/* Franja dorada superior */
+.cal-event.is-important::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    rgba(255, 230, 80, 0.9) 0%,
+    rgba(255, 180, 0, 0.7) 60%,
+    rgba(255, 230, 80, 0.5) 100%
+  );
+  border-radius: 4px 4px 0 0;
+}
+
+/* ── TOGGLE IMPORTANTE EN MODAL ──────────────────────────── */
+.btn-important-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--clr-border);
+  background: var(--clr-bg);
+  color: var(--clr-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.btn-important-toggle:hover {
+  border-color: #f59e0b;
+  color: #92400e;
+  background: #fffdf0;
+}
+
+.btn-important-toggle.is-active {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #78350f;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.btn-important-toggle .toggle-star {
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.btn-important-toggle.is-active .toggle-star {
+  transform: scale(1.2) rotate(-5deg);
 }
 
 /* ── CURRENT TIME LINE ───────────────────────────────────── */
