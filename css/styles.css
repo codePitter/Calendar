@@ -1285,6 +1285,49 @@ a.ctx-link:hover { opacity: .75; }
 
 .ctx-btn-danger:hover { background: #fff1f1; }
 
+/* ── CONTEXT MENU HEADER CON BOTÓN CERRAR ─────────────────── */
+.ctx-header {
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.ctx-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  position: relative;
+}
+
+.ctx-close {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--clr-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.ctx-close:hover {
+  background: var(--clr-border);
+  color: var(--clr-text);
+}
+
+/* Ajustar el resto del contenido para que no se solape con el botón */
+.ctx-info {
+  flex: 1;
+  padding-right: 24px;
+}
 
 /* ════════════════════════════════════════════════════════════
    PRESET DROPDOWN (desplegable desde input Título)

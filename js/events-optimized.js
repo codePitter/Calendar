@@ -1092,6 +1092,158 @@ function hideContextMenu() {
 
 /* ── Context menu click on event ─────────────────────────– */
 
+/* ── Context menu ───────────────────────────────────────– */
+
+function createContextMenu() {
+  if (document.getElementById('context-menu')) return;
+
+  $ctxMenu = document.createElement('div');
+  $ctxMenu.id = 'context-menu';
+  $ctxMenu.className = 'context-menu';
+  $ctxMenu.hidden = true;
+  document.body.appendChild($ctxMenu);
+
+  // Cerrar al hacer click fuera
+  document.addEventListener('click', (e) => {
+    if (!$ctxMenu.hidden && !$ctxMenu.contains(e.target)) {
+      hideContextMenu();
+    }
+  });
+  
+  // Cerrar con tecla ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$ctxMenu.hidden) {
+      hideContextMenu();
+    }
+  });
+}
+
+function showContextMenu(eventObj, x, y) {
+  if (!$ctxMenu) return;
+
+  // Guardar el evento para usarlo después
+  _ctxEvent = eventObj;
+
+  // Escapar HTML para seguridad
+  const escapeHTML = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  };
+
+  // Procesar URLs en la descripción
+  const formatDescription = (desc) => {
+    if (!desc) return '';
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return escapeHTML(desc).replace(urlRegex, (url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ctx-link" onclick="event.stopPropagation()">${escapeHTML(url)}</a>`;
+    });
+  };
+
+  const title = escapeHTML(eventObj.title);
+  const desc = eventObj.desc || '';
+  const startTime = eventObj.startTime;
+  const endTime = eventObj.endTime;
+  const isRecurring = eventObj.recurrence && eventObj.recurrence !== 'none';
+  const recurrenceText = isRecurring ? ` 🔄 ${window.CalApp.CONFIG.RECURRENCE_LABELS[eventObj.recurrence] || eventObj.recurrence}` : '';
+  const importantStar = eventObj.important ? '⭐ ' : '';
+  
+  // Color del evento para el indicador
+  const eventColor = eventObj.color || '#4f46e5';
+
+  $ctxMenu.innerHTML = `
+    <div class="ctx-header">
+      <div class="ctx-head">
+        <div class="ctx-color-dot" style="background: ${eventColor}"></div>
+        <div class="ctx-info">
+          <div class="ctx-title">${importantStar}${title}${recurrenceText}</div>
+          <div class="ctx-time">${startTime} – ${endTime}</div>
+        </div>
+        <button class="ctx-close" id="ctx-close-btn" aria-label="Cerrar">×</button>
+      </div>
+    </div>
+    ${desc ? `<div class="ctx-desc">${formatDescription(desc)}</div>` : '<div class="ctx-no-desc">Sin descripción</div>'}
+    <div class="ctx-actions">
+      <button class="ctx-btn ctx-edit" id="ctx-edit-btn">✏️ Editar</button>
+      <button class="ctx-btn ctx-btn-danger ctx-delete" id="ctx-delete-btn">🗑️ Eliminar</button>
+    </div>
+  `;
+
+  // Posicionar el menú
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  
+  let left = x;
+  let top = y;
+  
+  // Ajustar si se sale por la derecha
+  if (left + 320 > viewportWidth) {
+    left = viewportWidth - 320 - 10;
+  }
+  
+  // Ajustar si se sale por la izquierda
+  if (left < 10) {
+    left = 10;
+  }
+  
+  // Ajustar si se sale por abajo
+  if (top + 280 > viewportHeight) {
+    top = viewportHeight - 280 - 10;
+  }
+  
+  // Ajustar si se sale por arriba
+  if (top < 10) {
+    top = 10;
+  }
+  
+  $ctxMenu.style.left = `${left}px`;
+  $ctxMenu.style.top = `${top}px`;
+  $ctxMenu.hidden = false;
+
+  // Event listeners
+  const closeBtn = document.getElementById('ctx-close-btn');
+  const editBtn = document.getElementById('ctx-edit-btn');
+  const deleteBtn = document.getElementById('ctx-delete-btn');
+  
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      hideContextMenu();
+    };
+  }
+  
+  if (editBtn) {
+    editBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (_ctxEvent) {
+        openModal(_ctxEvent.dateKey, null, _ctxEvent);
+      }
+      hideContextMenu();
+    };
+  }
+  
+  if (deleteBtn) {
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (_ctxEvent && confirm(`¿Eliminar "${_ctxEvent.title}"?`)) {
+        State.deleteEvent(_ctxEvent.dateKey, _ctxEvent.id);
+        window.CalApp.renderAndBind();
+      }
+      hideContextMenu();
+    };
+  }
+}
+
+function hideContextMenu() {
+  if ($ctxMenu) $ctxMenu.hidden = true;
+  _ctxEvent = null;
+}
+
+/* ── Context menu click on event ─────────────────────────– */
+
 function handleContextMenu(e) {
   const evtEl = e.target.closest('.cal-event');
   if (!evtEl) return;
