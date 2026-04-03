@@ -196,7 +196,17 @@ window.CalApp.Auth = (function () {
       let error;
 
       if (_mode === 'login') {
-        ({ error } = await _client.auth.signInWithPassword({ email, password }));
+        const result = await _client.auth.signInWithPassword({ email, password });
+        error = result.error;
+
+        // Si el login fue exitoso, cerrar el modal de inmediato sin esperar onAuthStateChange
+        if (!error && result.data?.user) {
+          _user = result.data.user;
+          _hideModal();
+          _updateBadge(_user.email);
+          window.CalApp.renderAndBind?.();
+          // La sincronización con Supabase se hará cuando dispare onAuthStateChange
+        }
       } else {
         const { error: signUpError } = await _client.auth.signUp({ email, password });
         error = signUpError;
