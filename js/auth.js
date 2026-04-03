@@ -38,14 +38,24 @@ window.CalApp.Auth = (function () {
         // No re-ejecutar afterSignIn si estamos en flujo de actualizar contraseña
         if (_mode !== 'update-password') await _afterSignIn();
 
-      } else if (event === 'SIGNED_OUT') {
-        _user = null;
-        _afterSignOut();
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // Token refrescado correctamente — actualizar referencia (no re-renderizar)
+        _user = session.user;
 
-      } else if (event === 'TOKEN_REFRESHED' && !session) {
-        // Token de refresco inválido — limpiar y volver al login
-        console.warn('[Auth] Token refresh fallido, cerrando sesión');
-        await _client.auth.signOut();
+      } else if (event === 'SIGNED_OUT') {
+        // ── FIX: race condition ────────────────────────────────────────────────
+        // Supabase puede emitir SIGNED_OUT por un refresh token viejo en background
+        // DESPUÉS de que el usuario ya inició sesión correctamente. Solo procesamos
+        // el sign-out si fue explícitamente iniciado por el usuario (_intentionalSignOut)
+        // o si realmente no hay usuario activo en este momento.
+        if (_intentionalSignOut || !_user) {
+          _user = null;
+          _intentionalSignOut = false;
+          _afterSignOut();
+        } else {
+          console.warn('[Auth] SIGNED_OUT espurio ignorado (token viejo en background)');
+          _intentionalSignOut = false;
+        }
 
       } else if (event === 'PASSWORD_RECOVERY') {
         // Usuario llegó desde el email de reset → mostrar formulario de nueva contraseña
@@ -82,7 +92,8 @@ window.CalApp.Auth = (function () {
      POST SIGN-IN / SIGN-OUT
   ══════════════════════════════════════════════════════════ */
 
-  let _afterSignInRunning = false;
+  let _afterSignInRunning  = false;
+  let _intentionalSignOut  = false; // ← FIX: distinguir signOut voluntario de spurious
 
   async function _afterSignIn() {
     // Siempre cerrar el modal y mostrar el calendario, aunque ya esté corriendo
@@ -277,9 +288,6 @@ window.CalApp.Auth = (function () {
     _setLoading(true);
     _clearAllErrors();
 
-    _setLoading(true);
-    _clearAllErrors();
-
     try {
       const { error } = await _client.auth.updateUser({ password: p1 });
       if (error) {
@@ -350,6 +358,7 @@ window.CalApp.Auth = (function () {
   /* ── Cerrar sesión ──────────────────────────────────────── */
 
   async function signOut() {
+    _intentionalSignOut = true; // ← FIX: marcar como cierre intencional
     await _client?.auth.signOut();
   }
 
