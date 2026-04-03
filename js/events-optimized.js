@@ -108,6 +108,7 @@ window.CalApp.Events = (function () {
     const isLocalUrl = !dataUrl.startsWith('data:') && 
                        !dataUrl.startsWith('http://') && 
                        !dataUrl.startsWith('https://') &&
+                       !dataUrl.startsWith('blob:') &&
                        !dataUrl.startsWith('/');
     
     const compressedThumb = isLocalUrl
