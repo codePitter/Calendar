@@ -27,45 +27,10 @@ window.CalApp.State = (function () {
 
   /**
    * Parsea un string "YYYY-MM-DD" como fecha LOCAL (no UTC).
-   * new Date("YYYY-MM-DD") lo interpreta como medianoche UTC,
-   * lo que en zonas UTC-N produce el día anterior. Esta función lo evita.
    */
   function parseDateKey(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d);
-  }
-
-  /**
-   * Verifica si un evento recurrente debe mostrarse en una fecha específica
-   */
-  function shouldShowRecurringEvent(event, targetDate) {
-    if (!event.recurrence || event.recurrence === CONFIG.RECURRENCE_TYPES.NONE) {
-      return false;
-    }
-
-    const eventDate = parseDateKey(event.originalDate);
-    const target = parseDateKey(toDateKey(new Date(targetDate)));
-
-    switch (event.recurrence) {
-      case CONFIG.RECURRENCE_TYPES.DAILY:
-        return target >= eventDate;
-
-      case CONFIG.RECURRENCE_TYPES.WEEKLY:
-        if (target < eventDate) return false;
-        return target.getDay() === eventDate.getDay();
-
-      case CONFIG.RECURRENCE_TYPES.MONTHLY:
-        if (target < eventDate) return false;
-        return target.getDate() === eventDate.getDate();
-
-      case CONFIG.RECURRENCE_TYPES.YEARLY:
-        if (target < eventDate) return false;
-        return target.getMonth() === eventDate.getMonth() &&
-               target.getDate()  === eventDate.getDate();
-
-      default:
-        return false;
-    }
   }
 
   /**
@@ -79,7 +44,6 @@ window.CalApp.State = (function () {
     end.setHours(23, 59, 59, 999);
 
     for (const event of recurringEvents) {
-      // ✅ FIX: parsear como hora local, no UTC
       let currentDate = parseDateKey(event.originalDate);
       const endRecurrence = event.endRecurrence ? parseDateKey(event.endRecurrence) : null;
 
@@ -124,7 +88,7 @@ window.CalApp.State = (function () {
               currentDate.setMonth(currentDate.getMonth() + 1);
               break;
             default:
-              currentDate = new Date(end.getTime() + 1); // salir del loop
+              currentDate = new Date(end.getTime() + 1);
           }
         }
       }
@@ -204,15 +168,17 @@ window.CalApp.State = (function () {
     addEvent(event) {
       if (event.recurrence && event.recurrence !== CONFIG.RECURRENCE_TYPES.NONE) {
         const recurringEvent = {
-          id: event.id,
-          title: event.title,
-          startTime: event.startTime,
-          endTime: event.endTime,
-          desc: event.desc,
-          color: event.color,
-          recurrence: event.recurrence,
-          originalDate: event.dateKey,
-          endRecurrence: event.endRecurrence || null
+          id:            event.id,
+          title:         event.title,
+          startTime:     event.startTime,
+          endTime:       event.endTime,
+          desc:          event.desc,
+          color:         event.color,
+          important:     event.important  || false,  // ← FIX: guardar flag
+          imageUrl:      event.imageUrl   || null,   // ← FIX: guardar imagen
+          recurrence:    event.recurrence,
+          originalDate:  event.dateKey,
+          endRecurrence: event.endRecurrence || null,
         };
         this.recurringEvents.push(recurringEvent);
         Storage.saveRecurringEvents(this.recurringEvents);
@@ -230,13 +196,15 @@ window.CalApp.State = (function () {
       if (recurringIndex !== -1) {
         this.recurringEvents[recurringIndex] = {
           ...this.recurringEvents[recurringIndex],
-          title: event.title,
-          startTime: event.startTime,
-          endTime: event.endTime,
-          desc: event.desc,
-          color: event.color,
-          recurrence: event.recurrence,
-          endRecurrence: event.endRecurrence || null
+          title:         event.title,
+          startTime:     event.startTime,
+          endTime:       event.endTime,
+          desc:          event.desc,
+          color:         event.color,
+          important:     event.important  || false,  // ← FIX
+          imageUrl:      event.imageUrl   || null,   // ← FIX
+          recurrence:    event.recurrence,
+          endRecurrence: event.endRecurrence || null,
         };
         Storage.saveRecurringEvents(this.recurringEvents);
       } else {

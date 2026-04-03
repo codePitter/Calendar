@@ -42,7 +42,7 @@ window.CalApp.Calendar = (function () {
 
   /* ── API pública: yToHour ─────────────────────────────────── */
 
-  function yToHour(y, dateKey) {
+  function yToHour(y) {
     const slotMap = _referenceSlotMap;
     if (!slotMap.length) return CONFIG.START_HOUR;
 
@@ -201,6 +201,7 @@ window.CalApp.Calendar = (function () {
     const showTime    = height > 38;
     const isRecurring = evt.recurrence && evt.recurrence !== 'none';
     const isImportant = !!evt.important;
+    const hasImage    = !!evt.imageUrl;
 
     const recurrenceIcon = isRecurring ? ' 🔄' : '';
 
@@ -208,17 +209,48 @@ window.CalApp.Calendar = (function () {
     const classes = [
       'cal-event',
       isImportant ? 'is-important' : '',
+      hasImage    ? 'has-image'    : '',
     ].filter(Boolean).join(' ');
 
-    // z-index explícito: importantes en primer plano sobre el resto
-    const zIndex  = isImportant ? 50 : 5;
+    const zIndex = isImportant ? 50 : 5;
+
+    // Estilo principal
+    let styleStr;
+    if (hasImage) {
+      styleStr = [
+        `top:${top}px`,
+        `height:${height}px`,
+        `background-image:url("${escapeAttr(evt.imageUrl)}")`,
+        `background-size:cover`,
+        `background-position:center`,
+        `z-index:${zIndex}`,
+      ].join(';');
+    } else {
+      styleStr = [
+        `top:${top}px`,
+        `height:${height}px`,
+        `background:${color}`,
+        `z-index:${zIndex}`,
+      ].join(';');
+    }
+
+    // Overlay de color cuando hay imagen (da legibilidad)
+    const overlayHTML = hasImage
+      ? `<div class="cal-event-img-overlay" style="background:${color}cc;"></div>`
+      : '';
+
+    const titleAttr = escapeAttr(evt.title)
+      + (evt.desc  ? ' — ' + escapeAttr(evt.desc) : '')
+      + (isRecurring ? ' (Evento recurrente)' : '')
+      + (isImportant ? ' ⭐ Importante' : '');
 
     return `
       <div class="${classes}"
            data-event-id="${escapeAttr(evt.id)}"
            data-date-key="${escapeAttr(evt.dateKey)}"
-           style="top:${top}px;height:${height}px;background:${color};z-index:${zIndex};"
-           title="${escapeAttr(evt.title)}${evt.desc ? ' — ' + escapeAttr(evt.desc) : ''}${isRecurring ? ' (Evento recurrente)' : ''}${isImportant ? ' ⭐ Importante' : ''}">
+           style="${styleStr}"
+           title="${titleAttr}">
+        ${overlayHTML}
         <div class="cal-event-title">${escapeHTML(evt.title)}${recurrenceIcon}</div>
         ${showTime ? `<div class="cal-event-time">${evt.startTime}–${evt.endTime}</div>` : ''}
       </div>`;
