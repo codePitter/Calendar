@@ -12,7 +12,8 @@ window.CalApp.Events = (function () {
   let _pendingHour   = null;
   let _selectedColor = CONFIG.COLORS[0];
   let _isImportant   = false;
-  let _selectedImageUrl = null;     // ← imagen seleccionada
+  let _selectedImageUrl = null;     // ← data URL final (para guardar en evento)
+  let _selectedThumbUrl = null;     // ← URL original del thumb (para resaltar en grid)
 
   let $backdrop, $title, $inputTitle, $inputStart, $inputEnd,
       $inputDesc, $palette, $btnDelete, $btnSave, $recurrence,
@@ -169,22 +170,23 @@ window.CalApp.Events = (function () {
         <span>Buscando imágenes…</span>
       </div>`;
 
-    // Generamos 8 URLs únicas usando loremflickr (soporte de keywords, gratuito)
+    // Generamos 8 URLs usando picsum.photos (CORS abierto, sin redirect externo)
+    const safeQuery = query.trim().replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
     const thumbs = Array.from({ length: 8 }, (_, i) => {
-      const sig = _imgSeed + i;
-      const safeQuery = query.trim().replace(/\s+/g, ',');
-      const url = `https://loremflickr.com/280/180/${safeQuery}?lock=${sig}`;
-      return { url, sig };
+      const seed = `${safeQuery}-${i}-${_imgSeed % 9999}`;
+      const url  = `https://picsum.photos/seed/${seed}/280/180`;
+      return { url };
     });
 
-    grid.innerHTML = thumbs.map(({ url, sig }) => `
+    grid.innerHTML = thumbs.map(({ url }) => `
       <button type="button"
-              class="img-thumb${_selectedImageUrl === url ? ' selected' : ''}"
+              class="img-thumb${_selectedThumbUrl === url ? ' selected' : ''}"
               data-url="${url}"
               title="Seleccionar imagen">
         <img src="${url}"
              alt="Imagen"
              loading="lazy"
+             crossorigin="anonymous"
              onerror="this.closest('.img-thumb').style.display='none'">
         <div class="img-thumb-check">✓</div>
       </button>
@@ -195,8 +197,24 @@ window.CalApp.Events = (function () {
     });
   }
 
-  function selectImage(url) {
-    _selectedImageUrl = url;
+  async function selectImage(url) {
+    _selectedThumbUrl = url;
+
+    // Convertir a data URL para evitar restricciones de hotlinking en CSS background-image
+    try {
+      const response = await fetch(url, { mode: 'cors' });
+      const blob     = await response.blob();
+      _selectedImageUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror   = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      // Fallback: usar URL directa (puede no funcionar como background en algunos navegadores)
+      console.warn('[Events] No se pudo convertir imagen a data URL, usando URL directa:', e);
+      _selectedImageUrl = url;
+    }
 
     // Actualizar UI de thumbnails
     const grid = document.getElementById('img-grid');
@@ -213,6 +231,7 @@ window.CalApp.Events = (function () {
 
   function clearImage() {
     _selectedImageUrl = null;
+    _selectedThumbUrl = null;
 
     const grid = document.getElementById('img-grid');
     if (grid) grid.querySelectorAll('.img-thumb').forEach(t => t.classList.remove('selected'));
