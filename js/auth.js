@@ -68,7 +68,17 @@ window.CalApp.Auth = (function () {
      POST SIGN-IN / SIGN-OUT
   ══════════════════════════════════════════════════════════ */
 
+  let _afterSignInRunning = false;
+
   async function _afterSignIn() {
+    // Guard: evitar doble ejecución (onAuthStateChange + getSession pueden disparar juntos)
+    if (_afterSignInRunning) return;
+    _afterSignInRunning = true;
+
+    // Ocultar el modal de auth inmediatamente — el usuario ya está autenticado
+    _hideModal();
+    _updateBadge(_user.email);
+
     _setLoading(true);
     try {
       const Storage = window.CalApp.Storage;
@@ -102,8 +112,7 @@ window.CalApp.Auth = (function () {
       console.error('[Auth] afterSignIn error:', err);
     } finally {
       _setLoading(false);
-      _hideModal();
-      _updateBadge(_user.email);
+      _afterSignInRunning = false;
     }
   }
 
