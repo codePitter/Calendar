@@ -85,15 +85,25 @@ window.CalApp.Auth = (function () {
   let _afterSignInRunning = false;
 
   async function _afterSignIn() {
-    // Guard: evitar doble ejecución (onAuthStateChange + getSession pueden disparar juntos)
-    if (_afterSignInRunning) return;
-    _afterSignInRunning = true;
-
-    // Cerrar el modal inmediatamente — el usuario ya está autenticado
+    // Siempre cerrar el modal y mostrar el calendario, aunque ya esté corriendo
     _hideModal();
     _updateBadge(_user.email);
 
-    _setLoading(true);
+    // Guard: evitar doble sincronización de datos
+    if (_afterSignInRunning) return;
+    _afterSignInRunning = true;
+
+    // Render inmediato con datos locales — el usuario ve el calendario de inmediato
+    const { State, Storage } = window.CalApp;
+    if (State && Storage) {
+      State.events          = Storage.loadEvents();
+      State.recurringEvents = Storage.loadRecurringEvents();
+      const s = Storage.loadSettings();
+      if (s.endHour) State.endHour = s.endHour;
+    }
+    window.CalApp.renderAndBind?.();
+
+    // Sincronización con Supabase en segundo plano (sin bloquear la UI)
     try {
       const Storage = window.CalApp.Storage;
 
@@ -112,20 +122,19 @@ window.CalApp.Auth = (function () {
         await _migrateLocalToCloud();
       }
 
+      // Re-render con datos de la nube
       const { State } = window.CalApp;
-      if (State) {
+      if (State && Storage) {
         State.events          = Storage.loadEvents();
         State.recurringEvents = Storage.loadRecurringEvents();
         const s = Storage.loadSettings();
         if (s.endHour) State.endHour = s.endHour;
       }
-
       window.CalApp.renderAndBind?.();
 
     } catch (err) {
-      console.error('[Auth] afterSignIn error:', err);
+      console.error('[Auth] sync error (no crítico):', err);
     } finally {
-      _setLoading(false);
       _afterSignInRunning = false;
     }
   }
