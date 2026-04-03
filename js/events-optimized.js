@@ -893,73 +893,104 @@ window.CalApp.Events = (function () {
 
   /* ── Context menu ───────────────────────────────────────– */
 
-  function createContextMenu() {
-    if (document.getElementById('context-menu')) return;
+function createContextMenu() {
+  if (document.getElementById('context-menu')) return;
 
-    $ctxMenu = document.createElement('div');
-    $ctxMenu.id = 'context-menu';
-    $ctxMenu.className = 'context-menu';
-    $ctxMenu.hidden = true;
-    document.body.appendChild($ctxMenu);
+  $ctxMenu = document.createElement('div');
+  $ctxMenu.id = 'context-menu';  // ← Este ID debe coincidir con el CSS
+  $ctxMenu.className = 'context-menu';
+  $ctxMenu.hidden = true;
+  document.body.appendChild($ctxMenu);
 
-    document.addEventListener('click', hideContextMenu);
-  }
+  // Cerrar al hacer click fuera
+  document.addEventListener('click', (e) => {
+    if (!$ctxMenu.hidden && !$ctxMenu.contains(e.target)) {
+      hideContextMenu();
+    }
+  });
+}
 
-  function showContextMenu(event, x, y) {
-    if (!$ctxMenu) return;
+function showContextMenu(eventObj, x, y) {
+  if (!$ctxMenu) return;
 
-    const deleteBtn = `<button class="ctx-item ctx-delete" id="ctx-delete-btn">🗑️ Eliminar</button>`;
-    const editBtn   = `<button class="ctx-item ctx-edit" id="ctx-edit-btn">✏️ Editar</button>`;
+  // Guardar el evento para usarlo después
+  _ctxEvent = eventObj;
 
-    $ctxMenu.innerHTML = `${editBtn}${deleteBtn}`;
-    $ctxMenu.style.left = `${x}px`;
-    $ctxMenu.style.top  = `${y}px`;
-    $ctxMenu.hidden     = false;
-    _ctxEvent           = event;
+  const deleteBtn = `<button class="ctx-item ctx-delete" id="ctx-delete-btn">🗑️ Eliminar</button>`;
+  const editBtn   = `<button class="ctx-item ctx-edit" id="ctx-edit-btn">✏️ Editar</button>`;
 
-    document.getElementById('ctx-edit-btn').addEventListener('click', () => {
-      openModal(_ctxEvent.dateKey, null, _ctxEvent);
+  $ctxMenu.innerHTML = `${editBtn}${deleteBtn}`;
+  $ctxMenu.style.left = `${x}px`;
+  $ctxMenu.style.top  = `${y}px`;
+  $ctxMenu.hidden     = false;
+
+  // Remover listeners anteriores para evitar duplicados
+  const editBtnEl = document.getElementById('ctx-edit-btn');
+  const deleteBtnEl = document.getElementById('ctx-delete-btn');
+  
+  if (editBtnEl) {
+    editBtnEl.replaceWith(editBtnEl.cloneNode(true));
+    document.getElementById('ctx-edit-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (_ctxEvent) {
+        openModal(_ctxEvent.dateKey, null, _ctxEvent);
+      }
       hideContextMenu();
     });
-
-    document.getElementById('ctx-delete-btn').addEventListener('click', () => {
-      if (confirm(`¿Eliminar "${_ctxEvent.title}"?`)) {
+  }
+  
+  if (deleteBtnEl) {
+    deleteBtnEl.replaceWith(deleteBtnEl.cloneNode(true));
+    document.getElementById('ctx-delete-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (_ctxEvent && confirm(`¿Eliminar "${_ctxEvent.title}"?`)) {
         State.deleteEvent(_ctxEvent.dateKey, _ctxEvent.id);
         window.CalApp.renderAndBind();
       }
       hideContextMenu();
     });
   }
+}
 
-  function hideContextMenu() {
-    if ($ctxMenu) $ctxMenu.hidden = true;
-    _ctxEvent = null;
-  }
+function hideContextMenu() {
+  if ($ctxMenu) $ctxMenu.hidden = true;
+  _ctxEvent = null;
+}
 
-  /* ── Context menu click on event ─────────────────────────– */
+/* ── Context menu click on event ─────────────────────────– */
 
-  function handleContextMenu(e) {
-    const evtEl = e.target.closest('.cal-event');
-    if (!evtEl) return;
-    e.preventDefault();
+function handleContextMenu(e) {
+  const evtEl = e.target.closest('.cal-event');
+  if (!evtEl) return;
+  e.preventDefault();
+  e.stopPropagation();
 
-    const dateKey = evtEl.dataset.dateKey;
-    const eventId = evtEl.dataset.eventId;
+  const dateKey = evtEl.dataset.dateKey;
+  const eventId = evtEl.dataset.eventId;
 
-    let found = (State.events[dateKey] || []).find(ev => ev.id === eventId);
+  let found = (State.events[dateKey] || []).find(ev => ev.id === eventId);
 
-    if (!found) {
-      const weekDays = State.getWeekDays();
-      const expanded = expandRecurringEventsForRange(weekDays[0], weekDays[6], State.recurringEvents);
-      const expFound = expanded.find(ev => ev.id === eventId && ev.dateKey === dateKey);
-      if (expFound && expFound.originalEventId) {
-        const orig = State.recurringEvents.find(ev => ev.id === expFound.originalEventId);
-        if (orig) found = { ...orig, dateKey };
-      }
+  if (!found) {
+    const weekDays = State.getWeekDays();
+    const expanded = expandRecurringEventsForRange(weekDays[0], weekDays[6], State.recurringEvents);
+    const expFound = expanded.find(ev => ev.id === eventId && ev.dateKey === dateKey);
+    if (expFound && expFound.originalEventId) {
+      const orig = State.recurringEvents.find(ev => ev.id === expFound.originalEventId);
+      if (orig) found = { ...orig, dateKey, id: eventId };
     }
-
-    if (found) showContextMenu(found, e.clientX, e.clientY);
   }
+
+  if (found) {
+    // Ajustar posición para que no se salga de la pantalla
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // Crear el menú si no existe
+    if (!$ctxMenu) createContextMenu();
+    
+    showContextMenu(found, x, y);
+  }
+}
 
   /* ── Presets: Plantillas de eventos ─────────────────────── */
 

@@ -1137,7 +1137,44 @@ textarea { resize: vertical; }
 /* ════════════════════════════════════════════════════════════
    CONTEXT MENU (botón derecho sobre evento)
    ════════════════════════════════════════════════════════════ */
+/* ── CONTEXT MENU ──────────────────────────────────────────── */
+.context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  overflow: hidden;
+  min-width: 140px;
+}
 
+.context-menu .ctx-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 0.85rem;
+  font-family: var(--font-body);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: var(--clr-text);
+}
+
+.context-menu .ctx-item:hover {
+  background: var(--clr-bg);
+}
+
+.context-menu .ctx-delete {
+  color: #ef4444;
+  border-top: 1px solid var(--clr-border);
+}
+
+.context-menu .ctx-delete:hover {
+  background: #fef2f2;
+}
 .event-ctx-menu {
   position: fixed;
   z-index: 9999;
