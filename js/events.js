@@ -144,7 +144,7 @@ window.CalApp.Events = (function () {
     const confirmMsg = _currentEvent.recurrence && _currentEvent.recurrence !== 'none'
       ? `¿Eliminar el evento recurrente "${_currentEvent.title}" y todas sus ocurrencias?`
       : `¿Eliminar el evento "${_currentEvent.title}"?`;
-    
+
     if (!confirm(confirmMsg)) return;
     State.deleteEvent(_currentEvent.dateKey, _currentEvent.id);
     closeModal();
@@ -156,24 +156,21 @@ window.CalApp.Events = (function () {
     if (evtEl) {
       const dateKey = evtEl.dataset.dateKey;
       const eventId = evtEl.dataset.eventId;
-      
-      // Buscar primero en eventos normales
+
       let found = (State.events[dateKey] || []).find(ev => ev.id === eventId);
-      
-      // Si no está, buscar en recurrentes expandidos
+
       if (!found) {
-        const weekDays = State.getWeekDays();
+        const weekDays  = State.getWeekDays();
         const weekStart = weekDays[0];
-        const weekEnd = weekDays[6];
-        const expanded = expandRecurringEventsForRange(weekStart, weekEnd, State.recurringEvents);
+        const weekEnd   = weekDays[6];
+        const expanded  = expandRecurringEventsForRange(weekStart, weekEnd, State.recurringEvents);
         found = expanded.find(ev => ev.id === eventId && ev.dateKey === dateKey);
-        
-        // Si es recurrente, buscar el original para editar
+
         if (found && found.originalEventId) {
           found = State.recurringEvents.find(ev => ev.id === found.originalEventId);
         }
       }
-      
+
       if (found) openModal(dateKey, null, found);
       return;
     }
@@ -183,41 +180,37 @@ window.CalApp.Events = (function () {
 
     const dateKey = col.dataset.date;
     const rect = col.getBoundingClientRect();
-    const relY = e.clientY - rect.top;
-    const hour = window.CalApp.Calendar.yToHour(relY, dateKey);
+    const relY  = e.clientY - rect.top;
+    const hour  = window.CalApp.Calendar.yToHour(relY, dateKey);
 
     openModal(dateKey, hour);
   }
 
   function init() {
-    $backdrop = document.getElementById('modal-backdrop');
-    $title = document.getElementById('modal-heading');
+    $backdrop   = document.getElementById('modal-backdrop');
+    $title      = document.getElementById('modal-heading');
     $inputTitle = document.getElementById('evt-title');
     $inputStart = document.getElementById('evt-start');
-    $inputEnd = document.getElementById('evt-end');
-    $inputDesc = document.getElementById('evt-desc');
-    $palette = document.getElementById('color-palette');
-    $btnDelete = document.getElementById('btn-delete');
-    $btnSave = document.getElementById('btn-save');
+    $inputEnd   = document.getElementById('evt-end');
+    $inputDesc  = document.getElementById('evt-desc');
+    $palette    = document.getElementById('color-palette');
+    $btnDelete  = document.getElementById('btn-delete');
+    $btnSave    = document.getElementById('btn-save');
     $recurrence = document.getElementById('evt-recurrence');
-    
-    // Crear campo de fecha fin de recurrencia si no existe
+
     if (!document.getElementById('end-recurrence-group')) {
-      const modalBody = document.querySelector('.modal-body');
-      const recurrenceGroup = $recurrence.closest('.field-group');
-      
+      const recurrenceGroup    = $recurrence.closest('.field-group');
       const endRecurrenceGroup = document.createElement('div');
-      endRecurrenceGroup.id = 'end-recurrence-group';
+      endRecurrenceGroup.id        = 'end-recurrence-group';
       endRecurrenceGroup.className = 'field-group';
       endRecurrenceGroup.style.display = 'none';
       endRecurrenceGroup.innerHTML = `
         <label for="evt-end-recurrence">Hasta (opcional)</label>
         <input type="date" id="evt-end-recurrence">
       `;
-      
       recurrenceGroup.insertAdjacentElement('afterend', endRecurrenceGroup);
     }
-    
+
     $endRecurrence = document.getElementById('evt-end-recurrence');
 
     buildColorPalette();
@@ -226,7 +219,7 @@ window.CalApp.Events = (function () {
     document.getElementById('btn-cancel').addEventListener('click', closeModal);
     $btnSave.addEventListener('click', saveEvent);
     $btnDelete.addEventListener('click', deleteEvent);
-    
+
     if ($recurrence) {
       $recurrence.addEventListener('change', toggleEndRecurrenceField);
     }
@@ -245,29 +238,38 @@ window.CalApp.Events = (function () {
     document.getElementById('calendar-body').addEventListener('click', handleBodyClick);
   }
 
+  // ✅ FIX: parsear strings "YYYY-MM-DD" como hora local, no UTC
+  function parseDateKey(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
   // Función auxiliar para expandir recurrentes (necesaria en handleBodyClick)
   function expandRecurringEventsForRange(startDate, endDate, recurringEvents) {
     const { CONFIG } = window.CalApp;
     const expanded = [];
     const start = new Date(startDate);
-    const end = new Date(endDate);
-    
+    const end   = new Date(endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
     function toDateKey(date) {
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, '0');
       const d = String(date.getDate()).padStart(2, '0');
       return `${y}-${m}-${d}`;
     }
-    
+
     for (const event of recurringEvents) {
-      let currentDate = new Date(event.originalDate);
-      const endRecurrence = event.endRecurrence ? new Date(event.endRecurrence) : null;
-      
+      // ✅ FIX: usar parseDateKey en lugar de new Date(string) para evitar UTC offset
+      let currentDate = parseDateKey(event.originalDate);
+      const endRecurrence = event.endRecurrence ? parseDateKey(event.endRecurrence) : null;
+
       if (event.recurrence === CONFIG.RECURRENCE_TYPES.YEARLY) {
         let year = start.getFullYear();
         const eventMonth = currentDate.getMonth();
-        const eventDay = currentDate.getDate();
-        
+        const eventDay   = currentDate.getDate();
+
         while (year <= end.getFullYear()) {
           const occurrenceDate = new Date(year, eventMonth, eventDay);
           if (occurrenceDate >= start && occurrenceDate <= end) {
@@ -292,7 +294,7 @@ window.CalApp.Events = (function () {
               });
             }
           }
-          
+
           switch (event.recurrence) {
             case CONFIG.RECURRENCE_TYPES.DAILY:
               currentDate.setDate(currentDate.getDate() + 1);
@@ -304,12 +306,12 @@ window.CalApp.Events = (function () {
               currentDate.setMonth(currentDate.getMonth() + 1);
               break;
             default:
-              currentDate = new Date(end + 1);
+              currentDate = new Date(end.getTime() + 1); // salir del loop
           }
         }
       }
     }
-    
+
     return expanded;
   }
 

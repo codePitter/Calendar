@@ -26,6 +26,16 @@ window.CalApp.State = (function () {
   }
 
   /**
+   * Parsea un string "YYYY-MM-DD" como fecha LOCAL (no UTC).
+   * new Date("YYYY-MM-DD") lo interpreta como medianoche UTC,
+   * lo que en zonas UTC-N produce el día anterior. Esta función lo evita.
+   */
+  function parseDateKey(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  /**
    * Verifica si un evento recurrente debe mostrarse en una fecha específica
    */
   function shouldShowRecurringEvent(event, targetDate) {
@@ -33,33 +43,26 @@ window.CalApp.State = (function () {
       return false;
     }
 
-    const eventDate = new Date(event.originalDate);
-    const target = new Date(targetDate);
-    
-    // Resetear horas para comparar solo fechas
-    eventDate.setHours(0, 0, 0, 0);
-    target.setHours(0, 0, 0, 0);
+    const eventDate = parseDateKey(event.originalDate);
+    const target = parseDateKey(toDateKey(new Date(targetDate)));
 
     switch (event.recurrence) {
       case CONFIG.RECURRENCE_TYPES.DAILY:
         return target >= eventDate;
-        
+
       case CONFIG.RECURRENCE_TYPES.WEEKLY:
-        // Mismo día de la semana
         if (target < eventDate) return false;
         return target.getDay() === eventDate.getDay();
-        
+
       case CONFIG.RECURRENCE_TYPES.MONTHLY:
-        // Mismo día del mes
         if (target < eventDate) return false;
         return target.getDate() === eventDate.getDate();
-        
+
       case CONFIG.RECURRENCE_TYPES.YEARLY:
-        // Mismo mes y mismo día
         if (target < eventDate) return false;
-        return target.getMonth() === eventDate.getMonth() && 
-               target.getDate() === eventDate.getDate();
-        
+        return target.getMonth() === eventDate.getMonth() &&
+               target.getDate()  === eventDate.getDate();
+
       default:
         return false;
     }
@@ -71,18 +74,20 @@ window.CalApp.State = (function () {
   function expandRecurringEventsForRange(startDate, endDate, recurringEvents) {
     const expanded = [];
     const start = new Date(startDate);
-    const end = new Date(endDate);
-    
+    const end   = new Date(endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
     for (const event of recurringEvents) {
-      let currentDate = new Date(event.originalDate);
-      const endRecurrence = event.endRecurrence ? new Date(event.endRecurrence) : null;
-      
-      // Para eventos anuales, podemos generar varias ocurrencias
+      // ✅ FIX: parsear como hora local, no UTC
+      let currentDate = parseDateKey(event.originalDate);
+      const endRecurrence = event.endRecurrence ? parseDateKey(event.endRecurrence) : null;
+
       if (event.recurrence === CONFIG.RECURRENCE_TYPES.YEARLY) {
         let year = start.getFullYear();
         const eventMonth = currentDate.getMonth();
-        const eventDay = currentDate.getDate();
-        
+        const eventDay   = currentDate.getDate();
+
         while (year <= end.getFullYear()) {
           const occurrenceDate = new Date(year, eventMonth, eventDay);
           if (occurrenceDate >= start && occurrenceDate <= end) {
@@ -97,7 +102,6 @@ window.CalApp.State = (function () {
           year++;
         }
       } else {
-        // Para daily, weekly, monthly
         while (currentDate <= end) {
           if (currentDate >= start) {
             if (!endRecurrence || currentDate <= endRecurrence) {
@@ -108,8 +112,7 @@ window.CalApp.State = (function () {
               });
             }
           }
-          
-          // Avanzar según el tipo de recurrencia
+
           switch (event.recurrence) {
             case CONFIG.RECURRENCE_TYPES.DAILY:
               currentDate.setDate(currentDate.getDate() + 1);
@@ -121,12 +124,12 @@ window.CalApp.State = (function () {
               currentDate.setMonth(currentDate.getMonth() + 1);
               break;
             default:
-              currentDate = new Date(end + 1); // salir del loop
+              currentDate = new Date(end.getTime() + 1); // salir del loop
           }
         }
       }
     }
-    
+
     return expanded;
   }
 
@@ -185,18 +188,14 @@ window.CalApp.State = (function () {
     getEventsForDay(date) {
       const dateKey = toDateKey(date);
       const regularEvents = this.events[dateKey] || [];
-      
-      // Expandir eventos recurrentes para la semana completa
-      const weekDays = this.getWeekDays();
+
+      const weekDays  = this.getWeekDays();
       const weekStart = weekDays[0];
-      const weekEnd = weekDays[6];
-      
+      const weekEnd   = weekDays[6];
+
       const expandedRecurring = expandRecurringEventsForRange(weekStart, weekEnd, this.recurringEvents);
-      
-      // Filtrar solo los que corresponden a este día específico
       const dayRecurring = expandedRecurring.filter(ev => ev.dateKey === dateKey);
-      
-      // Combinar y ordenar por hora de inicio
+
       const allEvents = [...regularEvents, ...dayRecurring];
       return allEvents.sort((a, b) => a.startTime.localeCompare(b.startTime));
     },
@@ -204,7 +203,6 @@ window.CalApp.State = (function () {
     /* ── CRUD de eventos ────────────────────────────────── */
     addEvent(event) {
       if (event.recurrence && event.recurrence !== CONFIG.RECURRENCE_TYPES.NONE) {
-        // Es un evento recurrente
         const recurringEvent = {
           id: event.id,
           title: event.title,
@@ -219,7 +217,6 @@ window.CalApp.State = (function () {
         this.recurringEvents.push(recurringEvent);
         Storage.saveRecurringEvents(this.recurringEvents);
       } else {
-        // Evento normal
         const key = event.dateKey;
         if (!this.events[key]) this.events[key] = [];
         this.events[key].push(event);
@@ -228,11 +225,9 @@ window.CalApp.State = (function () {
     },
 
     updateEvent(event) {
-      // Buscar si es un evento recurrente
       const recurringIndex = this.recurringEvents.findIndex(e => e.id === event.id);
-      
+
       if (recurringIndex !== -1) {
-        // Actualizar evento recurrente
         this.recurringEvents[recurringIndex] = {
           ...this.recurringEvents[recurringIndex],
           title: event.title,
@@ -245,7 +240,6 @@ window.CalApp.State = (function () {
         };
         Storage.saveRecurringEvents(this.recurringEvents);
       } else {
-        // Evento normal
         const key = event.dateKey;
         if (this.events[key]) {
           const idx = this.events[key].findIndex(e => e.id === event.id);
@@ -258,14 +252,12 @@ window.CalApp.State = (function () {
     },
 
     deleteEvent(dateKey, eventId) {
-      // Buscar en eventos recurrentes
       const recurringIndex = this.recurringEvents.findIndex(e => e.id === eventId);
-      
+
       if (recurringIndex !== -1) {
         this.recurringEvents.splice(recurringIndex, 1);
         Storage.saveRecurringEvents(this.recurringEvents);
       } else {
-        // Evento normal
         if (this.events[dateKey]) {
           this.events[dateKey] = this.events[dateKey].filter(e => e.id !== eventId);
           if (this.events[dateKey].length === 0) delete this.events[dateKey];
