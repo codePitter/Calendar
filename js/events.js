@@ -464,7 +464,7 @@ window.CalApp.Events = (function () {
 
   /* ── Select folder image (con conversión a dataURL si es necesario) ── */
 
-  function selectFolderImage(img) {
+  async function selectFolderImage(img) {
     _selectedThumbUrl  = img.objectUrl;
     _selectedImageUrl  = null;
     _imgConvertPromise = null;
@@ -480,7 +480,7 @@ window.CalApp.Events = (function () {
 
     _imgConvertPromise = (async () => {
       try {
-        const blob = img.file || await (await fetch(img.objectUrl)).blob());
+        const blob = img.file || await (await fetch(img.objectUrl)).blob();
         const rawDataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
@@ -525,7 +525,7 @@ window.CalApp.Events = (function () {
 
   /* ── OPTIMIZADO: Select uploaded image (dataURL) ── */
 
-  function selectUploadedImageByDataUrl(dataUrl, fileName) {
+  async function selectUploadedImageByDataUrl(dataUrl, fileName) {
     _selectedThumbUrl  = dataUrl;
     _selectedImageUrl  = null;
     _imgConvertPromise = null;
