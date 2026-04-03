@@ -128,9 +128,15 @@ window.CalApp.Auth = (function () {
       const hasCloudData = (evCount || 0) + (recCount || 0) > 0;
 
       if (hasCloudData) {
+        // La nube tiene datos → cargar desde Supabase (tiene prioridad)
         await Storage.loadFromSupabase(_user.id);
       } else {
-        await _migrateLocalToCloud();
+        // La nube está vacía → solo migrar si hay datos locales para subir
+        // (evita borrar datos en la nube al iniciar sesión desde incógnito/otro dispositivo)
+        const localEvents    = Storage.loadEvents();
+        const localRecurring = Storage.loadRecurringEvents();
+        const hasLocalData   = Object.keys(localEvents).length > 0 || localRecurring.length > 0;
+        if (hasLocalData) await _migrateLocalToCloud();
       }
 
       // Re-render con datos de la nube
