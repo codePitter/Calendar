@@ -151,6 +151,14 @@ window.CalApp.Events = (function () {
   let _imgSeed      = Date.now();
 
   function buildImagePicker(container) {
+    const frameDotsHTML = CONFIG.COLORS.map((c, i) =>
+      `<button type="button"
+               class="color-dot frame-dot${i === 0 ? ' active' : ''}"
+               data-color="${c}"
+               style="background:${c}"
+               aria-label="Marco ${i + 1}"></button>`
+    ).join('');
+
     container.innerHTML = `
       <div class="img-recents-section" id="img-recents-section" style="display:none">
         <div class="img-recents-label">🕐 Recientes</div>
@@ -172,11 +180,25 @@ window.CalApp.Events = (function () {
           <div class="img-hint">✨ Elige una categoría o escribe tu búsqueda</div>
         </div>
       </div>
+      <div class="img-frame-row" id="img-frame-row">
+        <span class="img-frame-label">Marco</span>
+        <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
+          ${frameDotsHTML}
+        </div>
+      </div>
       <div class="img-selected-bar" id="img-selected-bar" style="display:none">
         <span>🖼️ Imagen seleccionada como fondo</span>
         <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
       </div>
     `;
+
+    // Frame color palette listener — sincroniza con _selectedColor
+    container.querySelector('#img-frame-palette').addEventListener('click', e => {
+      const dot = e.target.closest('.color-dot');
+      if (!dot) return;
+      _selectedColor = dot.dataset.color;
+      setActiveDot(_selectedColor); // sincroniza ambas paletas
+    });
 
     // Mostrar recientes al abrir
     renderRecentImages();
@@ -426,16 +448,11 @@ window.CalApp.Events = (function () {
     $inputTitle.focus();
     $inputTitle.classList.remove('error');
 
-    // Resetear estado activo de plantillas
-    refreshPresetsBar();
-    // Marcar chip activo si el evento tiene un preset que coincide
-    if (event) {
-      const presets = loadPresets();
-      const match   = presets.find(p => p.color === event.color && p.label === event.title);
-      if (match) {
-        const chip = document.querySelector(`.preset-chip[data-id="${match.id}"]`);
-        if (chip) chip.classList.add('active');
-      }
+    // Si el título ya coincide con una plantilla, aplicarla sin sobrescribir
+    const titleVal = $inputTitle.value.trim();
+    if (titleVal) {
+      const match = loadPresets().find(p => p.label.toLowerCase() === titleVal.toLowerCase());
+      if (match) applyPreset(match, false);
     }
   }
 
@@ -599,82 +616,138 @@ window.CalApp.Events = (function () {
     } catch (e) { console.warn('[Presets] Error eliminando:', e); }
   }
 
-  function refreshPresetsBar() {
-    const bar = document.getElementById('presets-bar');
-    if (bar) buildPresetsBar(bar);
+  function refreshPresetsBar() { /* no-op: replaced by dropdown */ }
+
+  /* ── Preset dropdown (anclado al input Título) ──────────── */
+
+  let $presetDropdown = null;
+
+  function buildPresetDropdown() {
+    if (document.getElementById('preset-dropdown')) return;
+
+    // Crear dropdown y anclarlo al wrapper del input título
+    const titleGroup = $inputTitle.closest('.field-group');
+    titleGroup.style.position = 'relative';
+
+    $presetDropdown = document.createElement('div');
+    $presetDropdown.id        = 'preset-dropdown';
+    $presetDropdown.className = 'preset-dropdown';
+    $presetDropdown.hidden    = true;
+    titleGroup.appendChild($presetDropdown);
+
+    // Mostrar al hacer focus en el título
+    $inputTitle.addEventListener('focus', () => showPresetDropdown(''));
+
+    // Filtrar mientras se escribe, y auto-aplicar si hay match exacto
+    $inputTitle.addEventListener('input', () => {
+      const q = $inputTitle.value;
+      showPresetDropdown(q);
+      // Auto-aplicar si el título coincide exactamente con una plantilla
+      const match = loadPresets().find(
+        p => p.label.toLowerCase() === q.toLowerCase()
+      );
+      if (match) applyPreset(match, /* fillTitle */ false);
+    });
+
+    // Ocultar al perder foco (delay para permitir click en ítem)
+    $inputTitle.addEventListener('blur', () =>
+      setTimeout(() => { if ($presetDropdown) $presetDropdown.hidden = true; }, 160)
+    );
   }
 
-  function buildPresetsBar(container) {
-    const presets    = loadPresets();
-    const customIds  = new Set(
+  function showPresetDropdown(query) {
+    if (!$presetDropdown) return;
+    const presets = loadPresets();
+    const q       = query.trim().toLowerCase();
+
+    const customIds = new Set(
       (() => { try { return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]').map(p => p.id); } catch { return []; } })()
     );
 
-    container.innerHTML = `
-      <div class="presets-header">
-        <span class="presets-label">Plantillas</span>
-        <button type="button" class="preset-save-btn" id="preset-save-btn" title="Guardar configuración actual como plantilla">＋ Guardar</button>
-      </div>
-      <div class="presets-chips" id="presets-chips">
-        ${presets.map(p => `
-          <div class="preset-chip-wrap">
-            <button type="button" class="preset-chip" data-id="${p.id}"
-                    style="--pc:${p.color}" title="${escapeAttr(p.label)}">
-              <span class="preset-dot" style="background:${p.color}"></span>
-              <span class="preset-icon">${p.icon || '📌'}</span>
-              <span class="preset-name">${escapeHTML(p.label)}</span>
-            </button>
+    const filtered = q
+      ? presets.filter(p => p.label.toLowerCase().includes(q))
+      : presets;
+
+    if (!filtered.length && q) {
+      $presetDropdown.hidden = true;
+      return;
+    }
+
+    const activeColor = _selectedColor;
+
+    $presetDropdown.innerHTML = `
+      <div class="preset-dd-list">
+        ${filtered.map(p => `
+          <button type="button" class="preset-dd-item${p.color === activeColor ? ' is-active' : ''}" data-id="${p.id}">
+            <span class="preset-dd-dot" style="background:${p.color}"></span>
+            <span class="preset-dd-icon">${p.icon || '📌'}</span>
+            <span class="preset-dd-name">${escapeHTML(p.label)}</span>
             ${customIds.has(p.id)
-              ? `<button type="button" class="preset-delete-btn" data-id="${p.id}" title="Eliminar plantilla">×</button>`
+              ? `<span class="preset-dd-del" data-del-id="${p.id}" title="Eliminar plantilla">×</span>`
               : ''}
-          </div>
+          </button>
         `).join('')}
+      </div>
+      <div class="preset-dd-footer">
+        <button type="button" class="preset-dd-save" id="preset-dd-save-btn">＋ Guardar como plantilla</button>
       </div>
     `;
 
-    // Chip click → apply
-    container.querySelectorAll('.preset-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const preset = presets.find(p => p.id === chip.dataset.id);
+    $presetDropdown.hidden = false;
+
+    // Seleccionar plantilla
+    $presetDropdown.querySelectorAll('.preset-dd-item').forEach(item => {
+      item.addEventListener('mousedown', e => {
+        e.preventDefault(); // evitar que blur cierre el dropdown antes del click
+        const preset = presets.find(p => p.id === item.dataset.id);
         if (!preset) return;
-        applyPreset(preset);
-        container.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
+        applyPreset(preset, /* fillTitle */ true);
+        $presetDropdown.hidden = true;
+        $inputTitle.focus();
       });
     });
 
-    // Delete custom preset
-    container.querySelectorAll('.preset-delete-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
+    // Eliminar plantilla custom
+    $presetDropdown.querySelectorAll('.preset-dd-del').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
         e.stopPropagation();
-        const id = btn.dataset.id;
+        e.preventDefault();
+        const id = btn.dataset.delId;
         const preset = presets.find(p => p.id === id);
         if (preset && confirm(`¿Eliminar la plantilla "${preset.label}"?`)) {
           deleteCustomPreset(id);
-          refreshPresetsBar();
+          showPresetDropdown($inputTitle.value);
         }
       });
     });
 
-    // Save current as preset
-    document.getElementById('preset-save-btn').addEventListener('click', () => {
-      const suggested = $inputTitle.value.trim() || 'Nueva plantilla';
-      const label = prompt('Nombre de la nueva plantilla:', suggested);
-      if (!label || !label.trim()) return;
-      const preset = {
-        id:       `custom_${Date.now()}`,
-        label:    label.trim(),
-        color:    _selectedColor,
-        icon:     '📌',
-        imageUrl: _selectedImageUrl || null,
-        thumbUrl: _selectedThumbUrl || null,
-      };
-      saveCustomPreset(preset);
-      refreshPresetsBar();
-    });
+    // Guardar como plantilla
+    const saveBtn = document.getElementById('preset-dd-save-btn');
+    if (saveBtn) {
+      saveBtn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const suggested = $inputTitle.value.trim() || 'Nueva plantilla';
+        const label = prompt('Nombre de la nueva plantilla:', suggested);
+        if (!label || !label.trim()) return;
+        saveCustomPreset({
+          id:       `custom_${Date.now()}`,
+          label:    label.trim(),
+          color:    _selectedColor,
+          icon:     '📌',
+          imageUrl: _selectedImageUrl || null,
+          thumbUrl: _selectedThumbUrl || null,
+        });
+        $presetDropdown.hidden = true;
+      });
+    }
   }
 
-  function applyPreset(preset) {
+  function buildPresetsBar(container) {
+    // No-op: presets now live as a dropdown on the title input
+    container.remove();
+  }
+
+  function applyPreset(preset, fillTitle = true) {
     _selectedColor = preset.color;
     setActiveDot(_selectedColor);
 
@@ -686,10 +759,8 @@ window.CalApp.Events = (function () {
       switchBgTab('imagen');
     }
 
-    if (!$inputTitle.value.trim()) {
+    if (fillTitle && !$inputTitle.value.trim()) {
       $inputTitle.value = preset.label;
-      $inputTitle.focus();
-      $inputTitle.select();
     }
   }
 
@@ -919,15 +990,8 @@ window.CalApp.Events = (function () {
     // Crear context menu flotante
     createContextMenu();
 
-    // Inyectar barra de plantillas al tope del modal body
-    const modalBody = $backdrop.querySelector('.modal-body');
-    if (modalBody && !document.getElementById('presets-bar')) {
-      const presetsBar = document.createElement('div');
-      presetsBar.id        = 'presets-bar';
-      presetsBar.className = 'presets-bar';
-      modalBody.prepend(presetsBar);
-      buildPresetsBar(presetsBar);
-    }
+    // Construir dropdown de plantillas anclado al input de título
+    buildPresetDropdown();
   }
 
   /* ── Helper: parsear date string como hora local ─────────── */
