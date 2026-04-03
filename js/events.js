@@ -957,6 +957,192 @@ window.CalApp.Events = (function () {
     if (found) showContextMenu(found, e.clientX, e.clientY);
   }
 
+  /* ── Presets: Plantillas de eventos ─────────────────────── */
+
+  function loadPresets() {
+    try {
+      const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+      const custom = raw ? JSON.parse(raw) : [];
+      return [...DEFAULT_PRESETS, ...custom];
+    } catch { return [...DEFAULT_PRESETS]; }
+  }
+
+  function saveCustomPreset(preset) {
+    try {
+      const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+      const custom = raw ? JSON.parse(raw) : [];
+      const idx = custom.findIndex(p => p.id === preset.id);
+      if (idx !== -1) custom[idx] = preset; else custom.push(preset);
+      localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(custom));
+    } catch (e) { console.warn('[Presets] Error guardando:', e); }
+  }
+
+  function deleteCustomPreset(id) {
+    try {
+      const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+      const custom = raw ? JSON.parse(raw) : [];
+      const filtered = custom.filter(p => p.id !== id);
+      localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(filtered));
+    } catch (e) { console.warn('[Presets] Error eliminando:', e); }
+  }
+
+  function refreshPresetsBar() { /* no-op: replaced by dropdown */ }
+
+  /* ── Preset dropdown (anclado al input Título) ──────────── */
+
+  let $presetDropdown = null;
+
+  function buildPresetDropdown() {
+    if (document.getElementById('preset-dropdown')) return;
+
+    // Crear dropdown y anclarlo al wrapper del input título
+    const titleGroup = $inputTitle.closest('.field-group');
+    titleGroup.style.position = 'relative';
+
+    $presetDropdown = document.createElement('div');
+    $presetDropdown.id        = 'preset-dropdown';
+    $presetDropdown.className = 'preset-dropdown';
+    $presetDropdown.hidden    = true;
+    titleGroup.appendChild($presetDropdown);
+
+    // Mostrar al hacer focus en el título
+    $inputTitle.addEventListener('focus', () => showPresetDropdown(''));
+
+    // Filtrar mientras se escribe, y auto-aplicar si hay match exacto
+    $inputTitle.addEventListener('input', () => {
+      const q = $inputTitle.value;
+      showPresetDropdown(q);
+      // Auto-aplicar si el título coincide exactamente con una plantilla
+      const match = loadPresets().find(
+        p => p.label.toLowerCase() === q.toLowerCase()
+      );
+      if (match) applyPreset(match, /* fillTitle */ false);
+    });
+
+    // Ocultar al perder foco (delay para permitir click en ítem)
+    $inputTitle.addEventListener('blur', () =>
+      setTimeout(() => { if ($presetDropdown) $presetDropdown.hidden = true; }, 160)
+    );
+  }
+
+  function showPresetDropdown(query) {
+    if (!$presetDropdown) return;
+    const presets = loadPresets();
+    const q       = query.trim().toLowerCase();
+
+    const customIds = new Set(
+      (() => { try { return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]').map(p => p.id); } catch { return []; } })()
+    );
+
+    const filtered = q
+      ? presets.filter(p => p.label.toLowerCase().includes(q))
+      : presets;
+
+    if (!filtered.length && q) {
+      $presetDropdown.hidden = true;
+      return;
+    }
+
+    const activeColor = _selectedColor;
+
+    $presetDropdown.innerHTML = `
+      <div class="preset-dd-list">
+        ${filtered.map(p => `
+          <button type="button" class="preset-dd-item${p.color === activeColor ? ' is-active' : ''}" data-id="${p.id}">
+            <span class="preset-dd-dot" style="background:${p.color}"></span>
+            <span class="preset-dd-icon">${p.icon || '📌'}</span>
+            <span class="preset-dd-name">${escapeHTML(p.label)}</span>
+            ${customIds.has(p.id)
+              ? `<span class="preset-dd-del" data-del-id="${p.id}" title="Eliminar plantilla">×</span>`
+              : ''}
+          </button>
+        `).join('')}
+      </div>
+      <div class="preset-dd-footer">
+        <button type="button" class="preset-dd-save" id="preset-dd-save-btn">＋ Guardar como plantilla</button>
+      </div>
+    `;
+
+    $presetDropdown.hidden = false;
+
+    // Seleccionar plantilla
+    $presetDropdown.querySelectorAll('.preset-dd-item').forEach(item => {
+      item.addEventListener('mousedown', e => {
+        e.preventDefault(); // evitar que blur cierre el dropdown antes del click
+        const preset = presets.find(p => p.id === item.dataset.id);
+        if (!preset) return;
+        applyPreset(preset, /* fillTitle */ true);
+        $presetDropdown.hidden = true;
+        $inputTitle.focus();
+      });
+    });
+
+    // Eliminar plantilla custom
+    $presetDropdown.querySelectorAll('.preset-dd-del').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        const id = btn.dataset.delId;
+        const preset = presets.find(p => p.id === id);
+        if (preset && confirm(`¿Eliminar la plantilla "${preset.label}"?`)) {
+          deleteCustomPreset(id);
+          showPresetDropdown($inputTitle.value);
+        }
+      });
+    });
+
+    // Guardar como plantilla
+    const saveBtn = document.getElementById('preset-dd-save-btn');
+    if (saveBtn) {
+      saveBtn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const suggested = $inputTitle.value.trim() || 'Nueva plantilla';
+        const label = prompt('Nombre de la nueva plantilla:', suggested);
+        if (!label || !label.trim()) return;
+        saveCustomPreset({
+          id:       `custom_${Date.now()}`,
+          label:    label.trim(),
+          color:    _selectedColor,
+          icon:     '📌',
+          imageUrl: _selectedImageUrl || null,
+          thumbUrl: _selectedThumbUrl || null,
+        });
+        $presetDropdown.hidden = true;
+      });
+    }
+  }
+
+  function buildPresetsBar(container) {
+    // No-op: presets now live as a dropdown on the title input
+    container.remove();
+  }
+
+  function applyPreset(preset, fillTitle = true) {
+    _selectedColor = preset.color;
+    setActiveDot(_selectedColor);
+
+    if (preset.imageUrl) {
+      _selectedImageUrl = preset.imageUrl;
+      _selectedThumbUrl = preset.thumbUrl || null;
+      const bar = document.getElementById('img-selected-bar');
+      if (bar) { bar.style.display = 'flex'; bar.querySelector('span').textContent = '🖼️ Imagen de plantilla'; }
+      switchBgTab('imagen');
+    }
+
+    if (fillTitle && !$inputTitle.value.trim()) {
+      $inputTitle.value = preset.label;
+    }
+  }
+
+  /* ── Helper: escapeHTML ─────────────────────────────────── */
+
+  function escapeHTML(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   /* ── Init ───────────────────────────────────────────────– */
 
   function init() {
