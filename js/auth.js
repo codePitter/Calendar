@@ -75,7 +75,7 @@ window.CalApp.Auth = (function () {
     if (_afterSignInRunning) return;
     _afterSignInRunning = true;
 
-    // Ocultar el modal de auth inmediatamente — el usuario ya está autenticado
+    // Cerrar el modal inmediatamente — el usuario ya está autenticado
     _hideModal();
     _updateBadge(_user.email);
 
@@ -209,7 +209,6 @@ window.CalApp.Auth = (function () {
 
     try {
       const { error } = await _client.auth.resetPasswordForEmail(email, { redirectTo });
-
       if (error) {
         _showError(_friendlyError(error.message), 'error', 'auth-reset-error');
       } else {
@@ -250,7 +249,6 @@ window.CalApp.Auth = (function () {
 
     try {
       const { error } = await _client.auth.updateUser({ password: p1 });
-
       if (error) {
         _showError(_friendlyError(error.message), 'error', 'auth-update-error');
       } else {
