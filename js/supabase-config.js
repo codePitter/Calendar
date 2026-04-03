@@ -9,6 +9,6 @@
 window.CalApp = window.CalApp || {};
 
 window.CalApp.SUPABASE_CONFIG = {
-  url:     'YOUR_SUPABASE_URL',
-  anonKey: 'YOUR_SUPABASE_ANON_KEY',
+  url:     'https://gsgokitstmsbkqyzxkpv.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzZ29raXRzdG1zYmtxeXp4a3B2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMzM5MzEsImV4cCI6MjA5MDgwOTkzMX0.ZjtXF67arlgrNbhaDuLUDtrf0NxeuDP0F7kWDnl_Un8',
 };
