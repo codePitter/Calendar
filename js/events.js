@@ -19,6 +19,24 @@ window.CalApp.Events = (function () {
   const RECENT_IMG_KEY  = 'agenda2026_recent_images';
   const RECENT_IMG_MAX  = 8;
 
+  /* ── Presets ─────────────────────────────────────────────── */
+
+  const PRESET_STORAGE_KEY = 'agenda2026_presets';
+
+  const DEFAULT_PRESETS = [
+    { id: 'trabajo',     label: 'Trabajo',      color: '#f97316', icon: '💼' },
+    { id: 'universidad', label: 'Universidad',   color: '#4f46e5', icon: '🎓' },
+    { id: 'personal',    label: 'Personal',      color: '#10b981', icon: '👤' },
+    { id: 'salud',       label: 'Salud',         color: '#ef4444', icon: '❤️' },
+    { id: 'social',      label: 'Social',        color: '#ec4899', icon: '🎉' },
+    { id: 'descanso',    label: 'Descanso',      color: '#8b5cf6', icon: '😴' },
+  ];
+
+  /* ── Context menu state ───────────────────────────────────── */
+
+  let $ctxMenu  = null;
+  let _ctxEvent = null;
+
   /* ── Recent images helpers ──────────────────────────────── */
 
   function loadRecentImages() {
@@ -85,13 +103,6 @@ window.CalApp.Events = (function () {
     $palette.querySelectorAll('.color-dot').forEach(d => {
       d.classList.toggle('active', d.dataset.color === color);
     });
-    // Sync frame palette in image panel
-    const framePalette = document.getElementById('img-frame-palette');
-    if (framePalette) {
-      framePalette.querySelectorAll('.color-dot').forEach(d => {
-        d.classList.toggle('active', d.dataset.color === color);
-      });
-    }
   }
 
   /* ── Toggle importante ──────────────────────────────────── */
@@ -140,14 +151,6 @@ window.CalApp.Events = (function () {
   let _imgSeed      = Date.now();
 
   function buildImagePicker(container) {
-    const frameDotsHTML = CONFIG.COLORS.map((c, i) =>
-      `<button type="button"
-               class="color-dot frame-dot${i === 0 ? ' active' : ''}"
-               data-color="${c}"
-               style="background:${c}"
-               aria-label="Marco color ${i + 1}"></button>`
-    ).join('');
-
     container.innerHTML = `
       <div class="img-recents-section" id="img-recents-section" style="display:none">
         <div class="img-recents-label">🕐 Recientes</div>
@@ -169,26 +172,11 @@ window.CalApp.Events = (function () {
           <div class="img-hint">✨ Elige una categoría o escribe tu búsqueda</div>
         </div>
       </div>
-      <div class="img-frame-row" id="img-frame-row">
-        <span class="img-frame-label">Marco</span>
-        <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
-          ${frameDotsHTML}
-        </div>
-      </div>
       <div class="img-selected-bar" id="img-selected-bar" style="display:none">
         <span>🖼️ Imagen seleccionada como fondo</span>
         <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
       </div>
     `;
-
-    // Frame color palette listener
-    container.querySelector('#img-frame-palette').addEventListener('click', e => {
-      const dot = e.target.closest('.color-dot');
-      if (!dot) return;
-      _selectedColor = dot.dataset.color;
-      // Sync both palettes
-      setActiveDot(_selectedColor);
-    });
 
     // Mostrar recientes al abrir
     renderRecentImages();
@@ -437,6 +425,18 @@ window.CalApp.Events = (function () {
     $backdrop.removeAttribute('aria-hidden');
     $inputTitle.focus();
     $inputTitle.classList.remove('error');
+
+    // Resetear estado activo de plantillas
+    refreshPresetsBar();
+    // Marcar chip activo si el evento tiene un preset que coincide
+    if (event) {
+      const presets = loadPresets();
+      const match   = presets.find(p => p.color === event.color && p.label === event.title);
+      if (match) {
+        const chip = document.querySelector(`.preset-chip[data-id="${match.id}"]`);
+        if (chip) chip.classList.add('active');
+      }
+    }
   }
 
   function closeModal() {
@@ -548,6 +548,266 @@ window.CalApp.Events = (function () {
     openModal(dateKey, hour);
   }
 
+  /* ── HTML helpers ───────────────────────────────────────── */
+
+  function escapeHTML(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function escapeAttr(str) {
+    return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function parseLinksInText(text) {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map(part => {
+      if (/^https?:\/\//.test(part)) {
+        return `<a href="#" class="ctx-link" data-href="${escapeAttr(part)}">${escapeHTML(part)}</a>`;
+      }
+      return escapeHTML(part).replace(/\n/g, '<br>');
+    }).join('');
+  }
+
+  /* ── Presets ─────────────────────────────────────────────── */
+
+  function loadPresets() {
+    try {
+      const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+      const custom = raw ? JSON.parse(raw) : [];
+      return [...DEFAULT_PRESETS, ...custom];
+    } catch { return [...DEFAULT_PRESETS]; }
+  }
+
+  function saveCustomPreset(preset) {
+    try {
+      const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+      const custom = raw ? JSON.parse(raw) : [];
+      const idx = custom.findIndex(p => p.id === preset.id);
+      if (idx !== -1) custom[idx] = preset; else custom.push(preset);
+      localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(custom));
+    } catch (e) { console.warn('[Presets] Error guardando:', e); }
+  }
+
+  function deleteCustomPreset(id) {
+    try {
+      const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+      const custom = raw ? JSON.parse(raw) : [];
+      const filtered = custom.filter(p => p.id !== id);
+      localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(filtered));
+    } catch (e) { console.warn('[Presets] Error eliminando:', e); }
+  }
+
+  function refreshPresetsBar() {
+    const bar = document.getElementById('presets-bar');
+    if (bar) buildPresetsBar(bar);
+  }
+
+  function buildPresetsBar(container) {
+    const presets    = loadPresets();
+    const customIds  = new Set(
+      (() => { try { return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]').map(p => p.id); } catch { return []; } })()
+    );
+
+    container.innerHTML = `
+      <div class="presets-header">
+        <span class="presets-label">Plantillas</span>
+        <button type="button" class="preset-save-btn" id="preset-save-btn" title="Guardar configuración actual como plantilla">＋ Guardar</button>
+      </div>
+      <div class="presets-chips" id="presets-chips">
+        ${presets.map(p => `
+          <div class="preset-chip-wrap">
+            <button type="button" class="preset-chip" data-id="${p.id}"
+                    style="--pc:${p.color}" title="${escapeAttr(p.label)}">
+              <span class="preset-dot" style="background:${p.color}"></span>
+              <span class="preset-icon">${p.icon || '📌'}</span>
+              <span class="preset-name">${escapeHTML(p.label)}</span>
+            </button>
+            ${customIds.has(p.id)
+              ? `<button type="button" class="preset-delete-btn" data-id="${p.id}" title="Eliminar plantilla">×</button>`
+              : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    // Chip click → apply
+    container.querySelectorAll('.preset-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const preset = presets.find(p => p.id === chip.dataset.id);
+        if (!preset) return;
+        applyPreset(preset);
+        container.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
+
+    // Delete custom preset
+    container.querySelectorAll('.preset-delete-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const preset = presets.find(p => p.id === id);
+        if (preset && confirm(`¿Eliminar la plantilla "${preset.label}"?`)) {
+          deleteCustomPreset(id);
+          refreshPresetsBar();
+        }
+      });
+    });
+
+    // Save current as preset
+    document.getElementById('preset-save-btn').addEventListener('click', () => {
+      const suggested = $inputTitle.value.trim() || 'Nueva plantilla';
+      const label = prompt('Nombre de la nueva plantilla:', suggested);
+      if (!label || !label.trim()) return;
+      const preset = {
+        id:       `custom_${Date.now()}`,
+        label:    label.trim(),
+        color:    _selectedColor,
+        icon:     '📌',
+        imageUrl: _selectedImageUrl || null,
+        thumbUrl: _selectedThumbUrl || null,
+      };
+      saveCustomPreset(preset);
+      refreshPresetsBar();
+    });
+  }
+
+  function applyPreset(preset) {
+    _selectedColor = preset.color;
+    setActiveDot(_selectedColor);
+
+    if (preset.imageUrl) {
+      _selectedImageUrl = preset.imageUrl;
+      _selectedThumbUrl = preset.thumbUrl || null;
+      const bar = document.getElementById('img-selected-bar');
+      if (bar) { bar.style.display = 'flex'; bar.querySelector('span').textContent = '🖼️ Imagen de plantilla'; }
+      switchBgTab('imagen');
+    }
+
+    if (!$inputTitle.value.trim()) {
+      $inputTitle.value = preset.label;
+      $inputTitle.focus();
+      $inputTitle.select();
+    }
+  }
+
+  /* ── Context menu ────────────────────────────────────────── */
+
+  function createContextMenu() {
+    $ctxMenu = document.createElement('div');
+    $ctxMenu.id        = 'event-ctx-menu';
+    $ctxMenu.className = 'event-ctx-menu';
+    $ctxMenu.hidden    = true;
+    document.body.appendChild($ctxMenu);
+
+    // Cerrar con click fuera o Escape
+    document.addEventListener('click', e => {
+      if ($ctxMenu && !$ctxMenu.contains(e.target)) hideContextMenu();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') hideContextMenu();
+    });
+  }
+
+  function showContextMenu(evt, x, y) {
+    _ctxEvent = evt;
+
+    const hasDesc   = !!(evt.desc && evt.desc.trim());
+    const descHTML  = hasDesc ? parseLinksInText(evt.desc) : '';
+    const dotColor  = evt.color || CONFIG.COLORS[0];
+    const isRecurring = evt.recurrence && evt.recurrence !== 'none';
+
+    $ctxMenu.innerHTML = `
+      <div class="ctx-head">
+        <span class="ctx-color-dot" style="background:${dotColor}"></span>
+        <div class="ctx-head-text">
+          <div class="ctx-title">${escapeHTML(evt.title)}${isRecurring ? ' <span class="ctx-recur">🔄</span>' : ''}</div>
+          <div class="ctx-time">${evt.startTime} – ${evt.endTime}</div>
+        </div>
+      </div>
+      ${hasDesc ? `<div class="ctx-desc">${descHTML}</div>` : '<div class="ctx-no-desc">Sin descripción</div>'}
+      <div class="ctx-actions">
+        <button class="ctx-btn" id="ctx-edit">✏️ Editar</button>
+        <button class="ctx-btn ctx-btn-danger" id="ctx-del">🗑️ Eliminar</button>
+      </div>
+    `;
+
+    $ctxMenu.hidden = false;
+
+    // Posicionar sin salirse de la pantalla
+    const W = $ctxMenu.offsetWidth  || 280;
+    const H = $ctxMenu.offsetHeight || 200;
+    let left = x + 4, top = y + 4;
+    if (left + W > window.innerWidth  - 8) left = x - W - 4;
+    if (top  + H > window.innerHeight - 8) top  = y - H - 4;
+    $ctxMenu.style.left = `${Math.max(4, left)}px`;
+    $ctxMenu.style.top  = `${Math.max(4, top)}px`;
+
+    // Editar
+    document.getElementById('ctx-edit').addEventListener('click', e => {
+      e.stopPropagation();
+      hideContextMenu();
+      openModal(evt.dateKey, null, evt);
+    });
+
+    // Eliminar
+    document.getElementById('ctx-del').addEventListener('click', e => {
+      e.stopPropagation();
+      const msg = isRecurring
+        ? `¿Eliminar el evento recurrente "${evt.title}" y todas sus ocurrencias?`
+        : `¿Eliminar "${evt.title}"?`;
+      if (confirm(msg)) {
+        hideContextMenu();
+        State.deleteEvent(evt.dateKey, evt.id);
+        window.CalApp.renderAndBind();
+      }
+    });
+
+    // Links en descripción
+    $ctxMenu.querySelectorAll('.ctx-link').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const href = link.dataset.href;
+        if (confirm(`¿Abrir este enlace en una nueva pestaña?\n\n${href}`)) {
+          window.open(href, '_blank', 'noopener,noreferrer');
+        }
+      });
+    });
+  }
+
+  function hideContextMenu() {
+    if ($ctxMenu) $ctxMenu.hidden = true;
+    _ctxEvent = null;
+  }
+
+  /* ── Context menu click on event ─────────────────────────── */
+
+  function handleContextMenu(e) {
+    const evtEl = e.target.closest('.cal-event');
+    if (!evtEl) return;
+    e.preventDefault();
+
+    const dateKey = evtEl.dataset.dateKey;
+    const eventId = evtEl.dataset.eventId;
+
+    let found = (State.events[dateKey] || []).find(ev => ev.id === eventId);
+
+    if (!found) {
+      const weekDays = State.getWeekDays();
+      const expanded = expandRecurringEventsForRange(weekDays[0], weekDays[6], State.recurringEvents);
+      const expFound = expanded.find(ev => ev.id === eventId && ev.dateKey === dateKey);
+      if (expFound && expFound.originalEventId) {
+        const orig = State.recurringEvents.find(ev => ev.id === expFound.originalEventId);
+        if (orig) found = { ...orig, dateKey };
+      }
+    }
+
+    if (found) showContextMenu(found, e.clientX, e.clientY);
+  }
+
   /* ── Init ───────────────────────────────────────────────── */
 
   function init() {
@@ -654,6 +914,20 @@ window.CalApp.Events = (function () {
     });
 
     document.getElementById('calendar-body').addEventListener('click', handleBodyClick);
+    document.getElementById('calendar-body').addEventListener('contextmenu', handleContextMenu);
+
+    // Crear context menu flotante
+    createContextMenu();
+
+    // Inyectar barra de plantillas al tope del modal body
+    const modalBody = $backdrop.querySelector('.modal-body');
+    if (modalBody && !document.getElementById('presets-bar')) {
+      const presetsBar = document.createElement('div');
+      presetsBar.id        = 'presets-bar';
+      presetsBar.className = 'presets-bar';
+      modalBody.prepend(presetsBar);
+      buildPresetsBar(presetsBar);
+    }
   }
 
   /* ── Helper: parsear date string como hora local ─────────── */
