@@ -957,6 +957,139 @@ function hideContextMenu() {
   _ctxEvent = null;
 }
 
+/* ── Context menu ───────────────────────────────────────– */
+
+function createContextMenu() {
+  if (document.getElementById('context-menu')) return;
+
+  $ctxMenu = document.createElement('div');
+  $ctxMenu.id = 'context-menu';
+  $ctxMenu.className = 'context-menu';
+  $ctxMenu.hidden = true;
+  document.body.appendChild($ctxMenu);
+
+  // Cerrar al hacer click fuera
+  document.addEventListener('click', (e) => {
+    if (!$ctxMenu.hidden && !$ctxMenu.contains(e.target)) {
+      hideContextMenu();
+    }
+  });
+}
+
+function showContextMenu(eventObj, x, y) {
+  if (!$ctxMenu) return;
+
+  // Guardar el evento para usarlo después
+  _ctxEvent = eventObj;
+
+  // Escapar HTML para seguridad
+  const escapeHTML = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  };
+
+  // Procesar URLs en la descripción
+  const formatDescription = (desc) => {
+    if (!desc) return '';
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return escapeHTML(desc).replace(urlRegex, (url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ctx-link" onclick="event.stopPropagation()">${escapeHTML(url)}</a>`;
+    });
+  };
+
+  const title = escapeHTML(eventObj.title);
+  const desc = eventObj.desc || '';
+  const startTime = eventObj.startTime;
+  const endTime = eventObj.endTime;
+  const isRecurring = eventObj.recurrence && eventObj.recurrence !== 'none';
+  const recurrenceText = isRecurring ? ` 🔄 ${window.CalApp.CONFIG.RECURRENCE_LABELS[eventObj.recurrence] || eventObj.recurrence}` : '';
+  const importantStar = eventObj.important ? '⭐ ' : '';
+  
+  // Color del evento para el indicador
+  const eventColor = eventObj.color || '#4f46e5';
+
+  $ctxMenu.innerHTML = `
+    <div class="ctx-head">
+      <div class="ctx-color-dot" style="background: ${eventColor}"></div>
+      <div class="ctx-info">
+        <div class="ctx-title">${importantStar}${title}${recurrenceText}</div>
+        <div class="ctx-time">${startTime} – ${endTime}</div>
+      </div>
+    </div>
+    ${desc ? `<div class="ctx-desc">${formatDescription(desc)}</div>` : '<div class="ctx-no-desc">Sin descripción</div>'}
+    <div class="ctx-actions">
+      <button class="ctx-btn ctx-edit" id="ctx-edit-btn">✏️ Editar</button>
+      <button class="ctx-btn ctx-btn-danger ctx-delete" id="ctx-delete-btn">🗑️ Eliminar</button>
+    </div>
+  `;
+
+  // Posicionar el menú
+  const menuRect = $ctxMenu.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  
+  let left = x;
+  let top = y;
+  
+  // Ajustar si se sale por la derecha
+  if (left + 280 > viewportWidth) {
+    left = viewportWidth - 280 - 10;
+  }
+  
+  // Ajustar si se sale por la izquierda
+  if (left < 10) {
+    left = 10;
+  }
+  
+  // Ajustar si se sale por abajo
+  if (top + 200 > viewportHeight) {
+    top = viewportHeight - 200 - 10;
+  }
+  
+  // Ajustar si se sale por arriba
+  if (top < 10) {
+    top = 10;
+  }
+  
+  $ctxMenu.style.left = `${left}px`;
+  $ctxMenu.style.top = `${top}px`;
+  $ctxMenu.hidden = false;
+
+  // Event listeners
+  const editBtn = document.getElementById('ctx-edit-btn');
+  const deleteBtn = document.getElementById('ctx-delete-btn');
+  
+  if (editBtn) {
+    editBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (_ctxEvent) {
+        openModal(_ctxEvent.dateKey, null, _ctxEvent);
+      }
+      hideContextMenu();
+    };
+  }
+  
+  if (deleteBtn) {
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (_ctxEvent && confirm(`¿Eliminar "${_ctxEvent.title}"?`)) {
+        State.deleteEvent(_ctxEvent.dateKey, _ctxEvent.id);
+        window.CalApp.renderAndBind();
+      }
+      hideContextMenu();
+    };
+  }
+}
+
+function hideContextMenu() {
+  if ($ctxMenu) $ctxMenu.hidden = true;
+  _ctxEvent = null;
+}
+
 /* ── Context menu click on event ─────────────────────────– */
 
 function handleContextMenu(e) {
@@ -968,8 +1101,23 @@ function handleContextMenu(e) {
   const dateKey = evtEl.dataset.dateKey;
   const eventId = evtEl.dataset.eventId;
 
-  let found = (State.events[dateKey] || []).find(ev => ev.id === eventId);
-
+  let found = null;
+  
+  // Buscar en eventos regulares
+  if (State.events[dateKey]) {
+    found = State.events[dateKey].find(ev => ev.id === eventId);
+  }
+  
+  // Buscar en eventos recurrentes
+  if (!found && State.recurringEvents) {
+    found = State.recurringEvents.find(ev => ev.id === eventId);
+    if (found) {
+      // Para eventos recurrentes, añadir la fecha actual
+      found = { ...found, dateKey };
+    }
+  }
+  
+  // Buscar en eventos expandidos (recurrentes de la semana actual)
   if (!found) {
     const weekDays = State.getWeekDays();
     const expanded = expandRecurringEventsForRange(weekDays[0], weekDays[6], State.recurringEvents);
@@ -981,14 +1129,8 @@ function handleContextMenu(e) {
   }
 
   if (found) {
-    // Ajustar posición para que no se salga de la pantalla
-    let x = e.clientX;
-    let y = e.clientY;
-    
-    // Crear el menú si no existe
     if (!$ctxMenu) createContextMenu();
-    
-    showContextMenu(found, x, y);
+    showContextMenu(found, e.clientX, e.clientY);
   }
 }
 
