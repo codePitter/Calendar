@@ -103,6 +103,13 @@ window.CalApp.Events = (function () {
     $palette.querySelectorAll('.color-dot').forEach(d => {
       d.classList.toggle('active', d.dataset.color === color);
     });
+    // Sincronizar también la paleta del panel Imagen (marco)
+    const framePalette = document.getElementById('img-frame-palette');
+    if (framePalette) {
+      framePalette.querySelectorAll('.color-dot').forEach(d => {
+        d.classList.toggle('active', d.dataset.color === color);
+      });
+    }
   }
 
   /* ── Toggle importante ──────────────────────────────────── */
