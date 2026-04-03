@@ -85,6 +85,13 @@ window.CalApp.Events = (function () {
     $palette.querySelectorAll('.color-dot').forEach(d => {
       d.classList.toggle('active', d.dataset.color === color);
     });
+    // Sync frame palette in image panel
+    const framePalette = document.getElementById('img-frame-palette');
+    if (framePalette) {
+      framePalette.querySelectorAll('.color-dot').forEach(d => {
+        d.classList.toggle('active', d.dataset.color === color);
+      });
+    }
   }
 
   /* ── Toggle importante ──────────────────────────────────── */
@@ -133,6 +140,14 @@ window.CalApp.Events = (function () {
   let _imgSeed      = Date.now();
 
   function buildImagePicker(container) {
+    const frameDotsHTML = CONFIG.COLORS.map((c, i) =>
+      `<button type="button"
+               class="color-dot frame-dot${i === 0 ? ' active' : ''}"
+               data-color="${c}"
+               style="background:${c}"
+               aria-label="Marco color ${i + 1}"></button>`
+    ).join('');
+
     container.innerHTML = `
       <div class="img-recents-section" id="img-recents-section" style="display:none">
         <div class="img-recents-label">🕐 Recientes</div>
@@ -154,11 +169,26 @@ window.CalApp.Events = (function () {
           <div class="img-hint">✨ Elige una categoría o escribe tu búsqueda</div>
         </div>
       </div>
+      <div class="img-frame-row" id="img-frame-row">
+        <span class="img-frame-label">Marco</span>
+        <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
+          ${frameDotsHTML}
+        </div>
+      </div>
       <div class="img-selected-bar" id="img-selected-bar" style="display:none">
         <span>🖼️ Imagen seleccionada como fondo</span>
         <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
       </div>
     `;
+
+    // Frame color palette listener
+    container.querySelector('#img-frame-palette').addEventListener('click', e => {
+      const dot = e.target.closest('.color-dot');
+      if (!dot) return;
+      _selectedColor = dot.dataset.color;
+      // Sync both palettes
+      setActiveDot(_selectedColor);
+    });
 
     // Mostrar recientes al abrir
     renderRecentImages();

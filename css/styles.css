@@ -887,6 +887,35 @@ textarea { resize: vertical; }
 .img-thumb.selected .img-thumb-check { opacity: 1; }
 
 /* Selected image bar */
+/* ── Marco color row (dentro del panel imagen) ─── */
+.img-frame-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.img-frame-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.img-frame-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Los .color-dot dentro de img-frame-palette heredan los estilos globales
+   de .color-dot definidos para la paleta principal */
+
 .img-selected-bar {
   display: flex;
   align-items: center;
