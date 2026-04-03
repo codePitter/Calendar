@@ -68,3 +68,35 @@ CREATE POLICY "settings_own" ON user_settings
   FOR ALL TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+-- ============================================================
+-- schema-addons.sql — Funciones adicionales para Agenda 2026
+-- Pegá esto en el SQL Editor de tu proyecto Supabase
+-- ============================================================
+
+-- ── Eliminar cuenta de usuario ────────────────────────────
+--
+-- Permite que un usuario autenticado elimine su propia cuenta.
+-- Usa SECURITY DEFINER para poder operar sobre auth.users,
+-- pero restringe la operación al uid() activo (no puede borrar
+-- cuentas ajenas).
+--
+-- Las tablas events, recurring_events y user_settings tienen
+-- ON DELETE CASCADE, así que sus datos se limpian solos.
+-- ─────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.delete_user()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Solo puede borrarse a sí mismo
+  DELETE FROM auth.users
+  WHERE id = auth.uid();
+END;
+$$;
+
+-- Solo los usuarios autenticados pueden llamar esta función
+REVOKE ALL ON FUNCTION public.delete_user() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_user() TO authenticated;
