@@ -1258,6 +1258,12 @@ window.CalApp.Events = (function () {
     // Crear context menu flotante
     createContextMenu();
 
+    const calendarBody = document.getElementById('calendar-body');
+
+    if (calendarBody) {
+        calendarBody.addEventListener('contextmenu', handleContextMenu);
+    }
+
     // Construir dropdown de plantillas anclado al input de título
     buildPresetDropdown();
   }
