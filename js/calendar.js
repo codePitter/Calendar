@@ -188,7 +188,10 @@ window.CalApp.Calendar = (function () {
              <span class="day-weather-icon">${w.emoji}</span>
              <span class="day-weather-temp">${w.maxTemp}°</span>
            </div>`
-        : '';
+        : `<div class="day-weather day-weather-ph" aria-hidden="true">
+             <span class="day-weather-icon">☀️</span>
+             <span class="day-weather-temp">--°</span>
+           </div>`;
 
       return `
         <div class="${classes}" data-date-key="${dateKey}" ${markStyle}>

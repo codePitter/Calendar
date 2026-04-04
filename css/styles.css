@@ -207,7 +207,6 @@ textarea { resize: vertical; }
   flex-shrink: 0;
   background: var(--clr-bg);
   padding: 0.5rem 0.75rem 0 0.75rem;
-  padding-top: 0.1rem;
 }
 
 .cal-corner {
@@ -1679,6 +1678,13 @@ a.ctx-link:hover { opacity: .75; }
 
 /* Placeholder invisible — reserva el mismo espacio que la etiqueta real */
 .day-mark-ph {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Placeholder invisible del clima — mantiene el alto uniforme */
+.day-weather-ph {
   visibility: hidden;
   pointer-events: none;
   user-select: none;
