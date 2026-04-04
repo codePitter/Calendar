@@ -11,6 +11,58 @@ window.CalApp.Calendar = (function () {
 
   let _referenceSlotMap = [];
 
+  /* ── Clima (Open-Meteo — sin API key) ────────────────────── */
+  const WEATHER_LAT  = -32.9468; // Rosario, Argentina
+  const WEATHER_LON  = -60.6393;
+  let   _weatherCache = {};      // dateKey → { emoji, maxTemp }
+  let   _weatherState = 'idle';  // 'idle' | 'loading' | 'done' | 'error'
+
+  const WMO_EMOJI = [
+    [0,  0,  '☀️'],
+    [1,  2,  '⛅'],
+    [3,  3,  '☁️'],
+    [45, 48, '🌫️'],
+    [51, 67, '🌧️'],
+    [71, 77, '❄️'],
+    [80, 82, '🌦️'],
+    [85, 86, '❄️'],
+    [95, 99, '⛈️'],
+  ];
+
+  function _wmoEmoji(code) {
+    for (const [lo, hi, icon] of WMO_EMOJI) {
+      if (code >= lo && code <= hi) return icon;
+    }
+    return '🌡️';
+  }
+
+  async function _fetchWeather() {
+    if (_weatherState === 'loading' || _weatherState === 'done') return;
+    _weatherState = 'loading';
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast`
+        + `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}`
+        + `&daily=weathercode,temperature_2m_max,temperature_2m_min`
+        + `&timezone=America%2FArgentina%2FBuenos_Aires`
+        + `&forecast_days=16`;
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const { time, weathercode, temperature_2m_max } = data.daily;
+      for (let i = 0; i < time.length; i++) {
+        _weatherCache[time[i]] = {
+          emoji:   _wmoEmoji(weathercode[i]),
+          maxTemp: Math.round(temperature_2m_max[i]),
+        };
+      }
+      _weatherState = 'done';
+      renderHeader(); // actualizar encabezados con datos de clima
+    } catch (err) {
+      console.warn('[Calendar] Clima no disponible:', err.message);
+      _weatherState = 'error';
+    }
+  }
+
   /* ── SlotMap ──────────────────────────────────────────────── */
 
   function buildSlotMap() {
@@ -130,11 +182,24 @@ window.CalApp.Calendar = (function () {
         ? `<span class="day-month-label">${CONFIG.MONTH_NAMES[d.getMonth()]}</span>`
         : '';
 
+      const w = _weatherCache[dateKey];
+      const weatherHTML = w
+        ? `<div class="day-weather">
+             <span class="day-weather-icon">${w.emoji}</span>
+             <span class="day-weather-temp">${w.maxTemp}°</span>
+           </div>`
+        : '';
+
       return `
         <div class="${classes}" data-date-key="${dateKey}" ${markStyle}>
-          <span class="day-name">${CONFIG.DAY_NAMES_SHORT[i]}</span>
-          <span class="day-number">${d.getDate()}</span>
-          ${monthLabel}
+          <div class="day-header-main">
+            <div class="day-left">
+              <span class="day-name">${CONFIG.DAY_NAMES_SHORT[i]}</span>
+              <span class="day-number">${d.getDate()}</span>
+              ${monthLabel}
+            </div>
+            ${weatherHTML}
+          </div>
           ${markLabel}
         </div>`;
     }).join('');
@@ -310,6 +375,7 @@ window.CalApp.Calendar = (function () {
   function render() {
     renderHeader();
     renderBody();
+    _fetchWeather(); // fire-and-forget; re-renderiza el header al completar
   }
 
   setInterval(updateCurrentTimeLine, 30_000);

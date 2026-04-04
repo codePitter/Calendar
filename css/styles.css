@@ -225,10 +225,50 @@ textarea { resize: vertical; }
 .cal-day-header {
   background: var(--clr-surface);
   border-radius: var(--radius);
-  padding: 0.45rem 0.25rem;
-  text-align: center;
+  padding: 0.28rem 0.5rem 0.28rem 0.6rem;
   transition: all 0.2s;
   border: 1px solid var(--clr-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-height: 0;
+}
+
+/* Fila principal: info del día (izquierda) + clima (derecha) */
+.day-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+/* Grupo izquierdo: nombre + número + mes */
+.day-left {
+  display: flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  flex-shrink: 0;
+}
+
+/* Clima (derecha) */
+.day-weather {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+
+.day-weather-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.day-weather-temp {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--clr-muted);
 }
 
 .cal-day-header.is-today {
@@ -237,7 +277,7 @@ textarea { resize: vertical; }
 }
 
 .day-name {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--clr-muted);
@@ -245,10 +285,10 @@ textarea { resize: vertical; }
 }
 
 .day-number {
-  font-size: 1.15rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--clr-text);
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .cal-day-header.is-today .day-number { color: var(--clr-today-num); }
@@ -266,6 +306,7 @@ textarea { resize: vertical; }
   display: flex;
   overflow: auto;
   padding: 0 0.75rem 0.75rem 0.75rem;
+  scrollbar-gutter: stable; /* reserva siempre el espacio del scrollbar → headers alineados */
 }
 
 .calendar-body::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1614,7 +1655,8 @@ a.ctx-link:hover { opacity: .75; }
 /* Texto sobre fondo coloreado: siempre blanco + sombra */
 .cal-day-header.is-marked .day-name,
 .cal-day-header.is-marked .day-number,
-.cal-day-header.is-marked .day-month-label {
+.cal-day-header.is-marked .day-month-label,
+.cal-day-header.is-marked .day-weather-temp {
   color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,0.35);
 }
