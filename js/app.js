@@ -83,6 +83,9 @@
   // 2. Inicializar módulo de eventos (modal + delegación de clics)
   Events.init();
 
+  // 3. Listener para marcar días (feriados / importantes)
+  Calendar.initDayMarkerListener();
+
   console.info(
     '%cAgenda 2026%c lista. Atajos: ←/→ semana · T = hoy',
     'color:#4a7c6f;font-weight:600;font-size:13px',

@@ -1457,3 +1457,315 @@ a.ctx-link:hover { opacity: .75; }
   flex-wrap: wrap;
   gap: 6px;
 }
+/* ════════════════════════════════════════════════════════════
+   EVENTO TRANSPARENTE
+   ════════════════════════════════════════════════════════════ */
+.cal-event.is-transparent {
+  background: rgba(255,255,255,0.55) !important;
+  border: 1.5px dashed #94a3b8 !important;
+  backdrop-filter: blur(2px);
+  box-shadow: none;
+}
+
+.cal-event.is-transparent .cal-event-title {
+  color: var(--clr-text);
+  text-shadow: none;
+}
+
+.cal-event.is-transparent .cal-event-time {
+  color: var(--clr-muted);
+  text-shadow: none;
+}
+
+.cal-event.is-transparent:hover {
+  background: rgba(255,255,255,0.75) !important;
+  filter: none;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PALETA DE COLORES — TRANSPARENTE + PICKER + RECIENTES
+   ════════════════════════════════════════════════════════════ */
+
+/* Fila de dots */
+.cp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 2px;
+}
+
+/* Dot transparente — patrón ajedrez */
+.color-dot.is-transparent {
+  background:
+    repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%)
+    0 0 / 10px 10px;
+  border: 2px solid #cbd5e1 !important;
+  position: relative;
+}
+
+.color-dot.is-transparent::after {
+  content: '∅';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1;
+}
+
+.color-dot.is-transparent.active {
+  box-shadow: 0 0 0 2px var(--clr-surface), 0 0 0 4px #64748b;
+}
+
+/* Dot picker — gradiente arco iris */
+.color-dot.is-picker {
+  background: conic-gradient(
+    hsl(0,90%,60%), hsl(60,90%,60%), hsl(120,90%,50%),
+    hsl(180,90%,50%), hsl(240,90%,60%), hsl(300,90%,60%), hsl(360,90%,60%)
+  );
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.color-dot.is-picker span {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.color-dot.is-picker.active {
+  box-shadow: 0 0 0 2px var(--clr-surface), 0 0 0 4px var(--clr-text);
+}
+
+/* Sección de colores recientes */
+.cp-recents {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.cp-recents-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--clr-muted);
+  white-space: nowrap;
+}
+
+.cp-recents-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* ════════════════════════════════════════════════════════════
+   ENCABEZADO DE DÍA MARCADO (feriado / importante)
+   ════════════════════════════════════════════════════════════ */
+
+.cal-day-header.is-marked {
+  border-color: transparent !important;
+  transition: filter 0.15s;
+}
+
+.cal-day-header.is-marked:hover {
+  filter: brightness(0.92);
+}
+
+/* Texto sobre fondo coloreado: siempre blanco + sombra */
+.cal-day-header.is-marked .day-name,
+.cal-day-header.is-marked .day-number,
+.cal-day-header.is-marked .day-month-label {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+
+/* Etiqueta de marca (Feriado, etc.) */
+.day-mark-label {
+  display: block;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Indicador de "clickeable" — cursor pointer sobre el header */
+.cal-day-header {
+  cursor: pointer;
+}
+
+.cal-day-header:hover:not(.is-today):not(.is-marked) {
+  background: var(--clr-border);
+}
+
+/* ════════════════════════════════════════════════════════════
+   DAY MARKER POPOVER
+   ════════════════════════════════════════════════════════════ */
+
+.day-marker-popover {
+  position: fixed;
+  z-index: 5000;
+  width: 240px;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.10);
+  overflow: hidden;
+  animation: ctx-pop .12s ease;
+}
+
+.day-marker-popover[hidden] { display: none; }
+
+.dmp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.dmp-title {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--clr-text);
+}
+
+.dmp-close {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  font-size: 16px;
+  color: var(--clr-muted);
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; cursor: pointer;
+  transition: all .15s;
+  line-height: 1;
+}
+.dmp-close:hover { background: var(--clr-border); color: var(--clr-text); }
+
+/* Preset buttons */
+.dmp-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 10px 4px;
+}
+
+.dmp-preset-btn {
+  padding: 4px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--clr-border);
+  background: var(--clr-bg);
+  font-size: .72rem;
+  font-weight: 500;
+  color: var(--clr-text);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.dmp-preset-btn:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+  background: #eef2ff;
+}
+
+.dmp-divider {
+  height: 1px;
+  background: var(--clr-border);
+  margin: 4px 10px;
+}
+
+/* Custom swatches */
+.dmp-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 4px;
+}
+
+.dmp-swatch {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  flex-shrink: 0;
+}
+.dmp-swatch:hover { transform: scale(1.15); }
+.dmp-swatch.active {
+  box-shadow: 0 0 0 2px var(--clr-surface), 0 0 0 4px var(--clr-text);
+  transform: scale(1.1);
+}
+
+/* Label input */
+.dmp-label-row {
+  padding: 6px 10px;
+}
+
+.dmp-label-input {
+  width: 100%;
+  padding: .45rem .65rem;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: .82rem;
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  outline: none;
+  transition: border-color .2s;
+}
+.dmp-label-input:focus { border-color: var(--clr-accent); }
+
+/* Action buttons */
+.dmp-actions {
+  display: flex;
+  gap: 6px;
+  padding: 4px 10px 10px;
+}
+
+.dmp-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--clr-border);
+  background: var(--clr-bg);
+  font-family: var(--font-body);
+  font-size: .78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmp-btn-save {
+  background: var(--clr-accent);
+  color: #fff;
+  border-color: var(--clr-accent);
+}
+.dmp-btn-save:hover { background: var(--clr-accent-dk); border-color: var(--clr-accent-dk); }
+
+.dmp-btn-remove {
+  color: #ef4444;
+  border-color: #fecaca;
+}
+.dmp-btn-remove:hover { background: #fff1f1; }

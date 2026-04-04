@@ -21,8 +21,10 @@ window.CalApp.Events = (function () {
   let _imgConvertPromise = null;   // Promise pendiente de conversión
   let _isLocalImage       = false; // ← NUEVO: Flag para saber si es imagen local
 
-  const RECENT_IMG_KEY  = 'agenda2026_recent_images';
-  const RECENT_IMG_MAX  = 8;
+  const RECENT_IMG_KEY    = 'agenda2026_recent_images';
+  const RECENT_IMG_MAX    = 8;
+  const RECENT_COLORS_KEY = 'agenda2026_recent_colors';
+  const RECENT_COLORS_MAX = 8;
 
   /* ── Presets ─────────────────────────────────────────────── */
 
@@ -87,6 +89,29 @@ window.CalApp.Events = (function () {
     } catch { return []; }
   }
 
+  /* ── Recent colors helpers ──────────────────────────────── */
+
+  function loadRecentColors() {
+    try {
+      const raw = localStorage.getItem(RECENT_COLORS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  }
+
+  function saveRecentColors(colors) {
+    try { localStorage.setItem(RECENT_COLORS_KEY, JSON.stringify(colors)); }
+    catch { /* ignorar */ }
+  }
+
+  function addToRecentColors(hex) {
+    if (!hex || hex === 'transparent') return;
+    const colors = loadRecentColors().filter(c => c !== hex);
+    colors.unshift(hex);
+    if (colors.length > RECENT_COLORS_MAX) colors.length = RECENT_COLORS_MAX;
+    saveRecentColors(colors);
+    renderRecentColors();
+  }
+
   function saveRecentImages(recents) {
     try {
       localStorage.setItem(RECENT_IMG_KEY, JSON.stringify(recents));
@@ -147,7 +172,8 @@ window.CalApp.Events = (function () {
   /* ── Color palette ──────────────────────────────────────── */
 
   function buildColorPalette() {
-    $palette.innerHTML = CONFIG.COLORS.map((c, i) =>
+    // ── Fila 1: colores predefinidos + transparente + picker ──
+    const fixedDotsHTML = CONFIG.COLORS.map((c, i) =>
       `<button type="button"
                class="color-dot${i === 0 ? ' active' : ''}"
                data-color="${c}"
@@ -155,20 +181,71 @@ window.CalApp.Events = (function () {
                aria-label="Color ${i + 1}"></button>`
     ).join('');
 
+    $palette.innerHTML = `
+      <div class="cp-row" id="cp-row-fixed">
+        ${fixedDotsHTML}
+        <button type="button" class="color-dot is-transparent" data-color="transparent"
+                aria-label="Transparente" title="Sin fondo (transparente)"></button>
+        <label class="color-dot is-picker" title="Elige un color personalizado" aria-label="Color personalizado">
+          <input type="color" id="cp-custom-input" style="opacity:0;position:absolute;width:0;height:0">
+          <span>+</span>
+        </label>
+      </div>
+      <div class="cp-recents" id="cp-recents" style="display:none">
+        <span class="cp-recents-label">Recientes</span>
+        <div class="cp-recents-row" id="cp-recents-row"></div>
+      </div>
+    `;
+
     $palette.addEventListener('click', e => {
-      const dot = e.target.closest('.color-dot');
+      const dot = e.target.closest('.color-dot[data-color]');
       if (!dot) return;
       _selectedColor = dot.dataset.color;
-      setActiveDot(_selectedColor); // sincroniza ambas paletas
+      setActiveDot(_selectedColor);
     });
+
+    // Color picker nativo
+    const cpInput = document.getElementById('cp-custom-input');
+    cpInput.addEventListener('input', e => {
+      _selectedColor = e.target.value;
+      setActiveDot(_selectedColor);
+    });
+    cpInput.addEventListener('change', e => {
+      _selectedColor = e.target.value;
+      setActiveDot(_selectedColor);
+      addToRecentColors(_selectedColor);
+    });
+
+    renderRecentColors();
+  }
+
+  function renderRecentColors() {
+    const section = document.getElementById('cp-recents');
+    const row     = document.getElementById('cp-recents-row');
+    if (!section || !row) return;
+    const colors = loadRecentColors();
+    if (!colors.length) { section.style.display = 'none'; return; }
+    section.style.display = 'flex';
+    row.innerHTML = colors.map(c =>
+      `<button type="button" class="color-dot" data-color="${c}"
+               style="background:${c}" aria-label="${c}" title="${c}"></button>`
+    ).join('');
   }
 
   function setActiveDot(color) {
-    // Paleta del tab Color
+    // Paleta del tab Color — marcar el dot activo
     if ($palette) {
-      $palette.querySelectorAll('.color-dot').forEach(d => {
+      $palette.querySelectorAll('.color-dot[data-color]').forEach(d => {
         d.classList.toggle('active', d.dataset.color === color);
       });
+      // Si es un color custom (no está en ningún dot), actualizar el input
+      const cpInput = document.getElementById('cp-custom-input');
+      if (cpInput && color && color !== 'transparent' && !CONFIG.COLORS.includes(color)) {
+        cpInput.value = color;
+        // Resaltar el botón picker como activo
+        const pickerDot = $palette.querySelector('.is-picker');
+        if (pickerDot) pickerDot.classList.add('active');
+      }
     }
     // Paleta del tab Imagen (marco) — sincronizar siempre
     const framePalette = document.getElementById('img-frame-palette');

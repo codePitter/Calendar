@@ -106,12 +106,24 @@ window.CalApp.Calendar = (function () {
 
     const corner     = `<div class="cal-corner"></div>`;
     const dayHeaders = days.map((d, i) => {
+      const dateKey = State.dateKey(d);
+      const mark    = State.markedDays?.[dateKey];
+
       const classes = [
         'cal-day-header',
         isToday(d) ? 'is-today' : '',
         i === 5    ? 'is-sat'   : '',
         i === 6    ? 'is-sun'   : '',
+        mark       ? 'is-marked' : '',
       ].filter(Boolean).join(' ');
+
+      const markStyle = mark
+        ? `style="background:${mark.color};"`
+        : '';
+
+      const markLabel = mark?.label
+        ? `<span class="day-mark-label">${escapeHTML(mark.label)}</span>`
+        : '';
 
       const showMonth  = (i === 0) || (d.getDate() === 1);
       const monthLabel = showMonth
@@ -119,10 +131,11 @@ window.CalApp.Calendar = (function () {
         : '';
 
       return `
-        <div class="${classes}">
+        <div class="${classes}" data-date-key="${dateKey}" ${markStyle}>
           <span class="day-name">${CONFIG.DAY_NAMES_SHORT[i]}</span>
           <span class="day-number">${d.getDate()}</span>
           ${monthLabel}
+          ${markLabel}
         </div>`;
     }).join('');
 
@@ -197,6 +210,7 @@ window.CalApp.Calendar = (function () {
     const bottom = timeToY(eh, em, slotMap);
     const height = Math.max(bottom - top, 20);
     const color  = evt.color || CONFIG.COLORS[0];
+    const isTransparent = color === 'transparent';
 
     const showTime    = height > 38;
     const isRecurring = evt.recurrence && evt.recurrence !== 'none';
@@ -208,8 +222,9 @@ window.CalApp.Calendar = (function () {
     // Clases del evento
     const classes = [
       'cal-event',
-      isImportant ? 'is-important' : '',
-      hasImage    ? 'has-image'    : '',
+      isImportant    ? 'is-important'   : '',
+      hasImage       ? 'has-image'      : '',
+      isTransparent  ? 'is-transparent' : '',
     ].filter(Boolean).join(' ');
 
     const zIndex = isImportant ? 50 : 5;
@@ -224,8 +239,15 @@ window.CalApp.Calendar = (function () {
         `background-size:cover`,
         `background-position:center`,
         `z-index:${zIndex}`,
-        `border:3px solid ${color}`,
+        `border:3px solid ${color === 'transparent' ? '#94a3b8' : color}`,
         `border-radius:var(--radius-event)`,
+      ].join(';');
+    } else if (isTransparent) {
+      styleStr = [
+        `top:${top}px`,
+        `height:${height}px`,
+        `background:transparent`,
+        `z-index:${zIndex}`,
       ].join(';');
     } else {
       styleStr = [
@@ -292,5 +314,169 @@ window.CalApp.Calendar = (function () {
 
   setInterval(updateCurrentTimeLine, 30_000);
 
-  return { render, updateCurrentTimeLine, yToHour };
+  /* ── Day Marker Popover ───────────────────────────────────── */
+
+  let _dmPopover        = null;
+  let _dmCurrentDateKey = null;
+  let _dmSelectedColor  = CONFIG.COLORS[0];
+  let _dmInited         = false;
+
+  const DM_PRESETS = [
+    { color: '#ef4444', emoji: '🔴', label: 'Feriado'     },
+    { color: '#f97316', emoji: '🟠', label: 'Importante'  },
+    { color: '#f59e0b', emoji: '🟡', label: 'Libre'       },
+    { color: '#10b981', emoji: '🟢', label: 'Especial'    },
+    { color: '#3b82f6', emoji: '🔵', label: 'Recordatorio'},
+    { color: '#8b5cf6', emoji: '🟣', label: 'Evento'      },
+  ];
+
+  function _buildDMPopover() {
+    if (_dmPopover) return;
+
+    const swatchesHTML = [
+      ...DM_PRESETS.map(p =>
+        `<button type="button" class="dmp-swatch" data-color="${p.color}"
+                 style="background:${p.color}" title="${p.label}"></button>`
+      ),
+      ...CONFIG.COLORS.filter(c => !DM_PRESETS.find(p => p.color === c)).map(c =>
+        `<button type="button" class="dmp-swatch" data-color="${c}"
+                 style="background:${c}" title="${c}"></button>`
+      ),
+    ].join('');
+
+    _dmPopover = document.createElement('div');
+    _dmPopover.id        = 'day-marker-popover';
+    _dmPopover.className = 'day-marker-popover';
+    _dmPopover.hidden    = true;
+    _dmPopover.innerHTML = `
+      <div class="dmp-header">
+        <span class="dmp-title">Marcar día</span>
+        <button type="button" class="dmp-close" id="dmp-close">×</button>
+      </div>
+      <div class="dmp-presets" id="dmp-presets">
+        ${DM_PRESETS.map(p =>
+          `<button type="button" class="dmp-preset-btn" data-color="${p.color}" data-label="${p.label}">
+            ${p.emoji} ${p.label}
+          </button>`
+        ).join('')}
+      </div>
+      <div class="dmp-divider"></div>
+      <div class="dmp-swatches" id="dmp-swatches">${swatchesHTML}</div>
+      <div class="dmp-label-row">
+        <input type="text" id="dmp-label" class="dmp-label-input"
+               placeholder="Etiqueta personalizada…" maxlength="28" autocomplete="off">
+      </div>
+      <div class="dmp-actions">
+        <button type="button" class="dmp-btn dmp-btn-remove" id="dmp-remove">Quitar</button>
+        <button type="button" class="dmp-btn dmp-btn-save"   id="dmp-save">Guardar</button>
+      </div>
+    `;
+    document.body.appendChild(_dmPopover);
+
+    // Swatch click
+    _dmPopover.querySelector('#dmp-swatches').addEventListener('click', e => {
+      const sw = e.target.closest('.dmp-swatch');
+      if (!sw) return;
+      _dmSelectedColor = sw.dataset.color;
+      _dmSyncSwatches();
+    });
+
+    // Preset buttons — fill color + label
+    _dmPopover.querySelector('#dmp-presets').addEventListener('click', e => {
+      const btn = e.target.closest('.dmp-preset-btn');
+      if (!btn) return;
+      _dmSelectedColor = btn.dataset.color;
+      const labelInput = document.getElementById('dmp-label');
+      if (labelInput && !labelInput.value.trim()) {
+        labelInput.value = btn.dataset.label;
+      }
+      _dmSyncSwatches();
+    });
+
+    document.getElementById('dmp-close').addEventListener('click', _closeDM);
+    document.getElementById('dmp-save').addEventListener('click', _saveDM);
+    document.getElementById('dmp-remove').addEventListener('click', _removeDM);
+
+    // Cerrar al click fuera
+    document.addEventListener('click', e => {
+      if (!_dmPopover.hidden &&
+          !_dmPopover.contains(e.target) &&
+          !e.target.closest('.cal-day-header[data-date-key]')) {
+        _closeDM();
+      }
+    }, true);
+  }
+
+  function _dmSyncSwatches() {
+    if (!_dmPopover) return;
+    _dmPopover.querySelectorAll('.dmp-swatch').forEach(s => {
+      s.classList.toggle('active', s.dataset.color === _dmSelectedColor);
+    });
+  }
+
+  function _openDM(dateKey, headerEl) {
+    _buildDMPopover();
+    _dmCurrentDateKey = dateKey;
+
+    const mark = State.markedDays?.[dateKey];
+    _dmSelectedColor = mark?.color || DM_PRESETS[0].color;
+
+    _dmSyncSwatches();
+    document.getElementById('dmp-label').value = mark?.label || '';
+    document.getElementById('dmp-remove').style.display = mark ? 'inline-flex' : 'none';
+
+    _dmPopover.hidden = false;
+
+    // Posicionar debajo del encabezado
+    const rect = headerEl.getBoundingClientRect();
+    const pw   = _dmPopover.offsetWidth  || 240;
+    const ph   = _dmPopover.offsetHeight || 220;
+    let left   = rect.left;
+    let top    = rect.bottom + 6;
+
+    if (left + pw > window.innerWidth  - 8) left = window.innerWidth  - pw - 8;
+    if (top  + ph > window.innerHeight - 8) top  = rect.top - ph - 6;
+    left = Math.max(8, left);
+
+    _dmPopover.style.left = `${left}px`;
+    _dmPopover.style.top  = `${top}px`;
+
+    setTimeout(() => document.getElementById('dmp-label')?.focus(), 50);
+  }
+
+  function _closeDM() {
+    if (_dmPopover) _dmPopover.hidden = true;
+    _dmCurrentDateKey = null;
+  }
+
+  function _saveDM() {
+    if (!_dmCurrentDateKey) return;
+    const label = document.getElementById('dmp-label')?.value.trim() || '';
+    State.setDayMark(_dmCurrentDateKey, { color: _dmSelectedColor, label });
+    render();
+    _closeDM();
+  }
+
+  function _removeDM() {
+    if (!_dmCurrentDateKey) return;
+    State.removeDayMark(_dmCurrentDateKey);
+    render();
+    _closeDM();
+  }
+
+  function initDayMarkerListener() {
+    if (_dmInited) return;
+    _dmInited = true;
+    document.getElementById('calendar-header').addEventListener('click', e => {
+      const hdr = e.target.closest('.cal-day-header[data-date-key]');
+      if (!hdr) return;
+      // Si el popover ya está abierto para este día, cerrarlo
+      if (!_dmPopover?.hidden && _dmCurrentDateKey === hdr.dataset.dateKey) {
+        _closeDM(); return;
+      }
+      _openDM(hdr.dataset.dateKey, hdr);
+    });
+  }
+
+  return { render, updateCurrentTimeLine, yToHour, initDayMarkerListener };
 })();

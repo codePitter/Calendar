@@ -106,6 +106,7 @@ window.CalApp.State = (function () {
     endHour: savedSettings.endHour || CONFIG.DEFAULT_END_HOUR,
     events: Storage.loadEvents(),
     recurringEvents: Storage.loadRecurringEvents(),
+    markedDays: Storage.loadMarkedDays(),
 
     /* ── Navegación ─────────────────────────────────────── */
     nextWeek() {
@@ -145,6 +146,17 @@ window.CalApp.State = (function () {
     },
 
     dateKey: toDateKey,
+
+    /* ── Días marcados (feriados, importantes) ──────────── */
+    setDayMark(dateKey, { color, label }) {
+      this.markedDays[dateKey] = { color, label: label || '' };
+      Storage.saveMarkedDays(this.markedDays);
+    },
+
+    removeDayMark(dateKey) {
+      delete this.markedDays[dateKey];
+      Storage.saveMarkedDays(this.markedDays);
+    },
 
     /**
      * Devuelve los eventos del día (incluyendo recurrentes expandidos)

@@ -14,6 +14,8 @@ window.CalApp.Storage = (function () {
   const { STORAGE_KEY_EVENTS, STORAGE_KEY_SETTINGS, STORAGE_KEY_RECURRING } =
     window.CalApp.CONFIG;
 
+  const STORAGE_KEY_MARKED_DAYS = 'agenda2026_marked_days';
+
   /* ══════════════════════════════════════════════════════════
      LOCAL STORAGE  (API sincrónica — sin cambios para el resto de la app)
   ══════════════════════════════════════════════════════════ */
@@ -149,6 +151,21 @@ window.CalApp.Storage = (function () {
     },
   };
 
+  function loadMarkedDays() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_MARKED_DAYS);
+      return raw ? JSON.parse(raw) : {};
+    } catch (err) {
+      console.warn('[Storage] Error cargando días marcados:', err);
+      return {};
+    }
+  }
+
+  function saveMarkedDays(data) {
+    try { localStorage.setItem(STORAGE_KEY_MARKED_DAYS, JSON.stringify(data)); }
+    catch (err) { console.error('[Storage] Error guardando días marcados:', err); }
+  }
+
   /* ══════════════════════════════════════════════════════════
      CARGA DESDE SUPABASE (llamado al hacer login)
   ══════════════════════════════════════════════════════════ */
@@ -226,6 +243,8 @@ window.CalApp.Storage = (function () {
     saveSettings,
     loadRecurringEvents,
     saveRecurringEvents,
+    loadMarkedDays,
+    saveMarkedDays,
     // Cloud
     loadFromSupabase,
     // Expuesto para migración en auth.js
