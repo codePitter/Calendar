@@ -438,23 +438,22 @@ textarea { resize: vertical; }
   }
 }
 
-@keyframes shimmer-bar {
-  0%   { background-position: -200% center; }
-  100% { background-position:  200% center; }
-}
-
-@keyframes chrome-sweep {
-  0%   { background-position: -150% 0; opacity: 0;   }
-  8%   {                                opacity: 1;   }
-  92%  {                                opacity: 1;   }
-  100% { background-position:  200% 0; opacity: 0;   }
-}
-
 @keyframes chrome-hue {
-  0%   { filter: hue-rotate(0deg)   saturate(1.2); }
-  33%  { filter: hue-rotate(30deg)  saturate(1.5); }
-  66%  { filter: hue-rotate(-20deg) saturate(1.4); }
-  100% { filter: hue-rotate(0deg)   saturate(1.2); }
+  0%   { filter: hue-rotate(0deg)   saturate(1.15); }
+  33%  { filter: hue-rotate(25deg)  saturate(1.4);  }
+  66%  { filter: hue-rotate(-15deg) saturate(1.3);  }
+  100% { filter: hue-rotate(0deg)   saturate(1.15); }
+}
+
+/*
+  chrome-global: animación de barrido ÚNICO de izquierda a derecha.
+  Con background-attachment: fixed todos los ::after comparten el mismo
+  espacio del viewport → el reflector pasa por todos los eventos a la vez.
+  Ciclo 4s: ~1s visible cruzando la pantalla + ~3s de pausa invisible.
+*/
+@keyframes chrome-global {
+  0%   { background-position: -200vw center; }   /* banda fuera por izquierda */
+  100% { background-position:  200vw center; }   /* banda fuera por derecha  */
 }
 
 .cal-event.is-important {
@@ -462,7 +461,8 @@ textarea { resize: vertical; }
   left: 2px;
   right: 2px;
   border: 2.5px solid #fbbf24;
-  animation: important-glow 2s ease-in-out infinite, chrome-hue 4s linear infinite;
+  animation: important-glow 2s ease-in-out infinite,
+             chrome-hue 4s linear infinite;
   isolation: isolate;
 }
 
@@ -477,27 +477,36 @@ textarea { resize: vertical; }
     0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
-/* ── Capa cromada: barre TODO el cuerpo del evento ───────── */
+/* ── Reflector global cromado — cubre TODO el evento ─────── */
 .cal-event.is-important::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: calc(var(--radius-event) - 2px);
+
+  /* Gradiente 90° — banda de luz centrada al 50% del bg (= 150vw) */
   background: linear-gradient(
-    108deg,
-    transparent           0%,
-    transparent          22%,
-    rgba(255,255,255,.08) 28%,
-    rgba(255,248,150,.30) 34%,
-    rgba(255,255,255,.55) 40%,
-    rgba(200,240,255,.35) 46%,
-    rgba(255,200,255,.20) 52%,
-    rgba(255,255,255,.08) 58%,
-    transparent          64%,
-    transparent         100%
+    90deg,
+    transparent            0%,
+    transparent           42%,
+    rgba(255,255,255,.05)  45%,
+    rgba(255,248,150,.28)  48%,
+    rgba(255,255,255,.58)  50%,
+    rgba(180,235,255,.30)  52%,
+    rgba(255,210,255,.18)  55%,
+    rgba(255,255,255,.05)  58%,
+    transparent            62%,
+    transparent           100%
   );
-  background-size: 350% 100%;
-  animation: chrome-sweep 2.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  /* 300vw de ancho: la banda de luz ocupa el 42-62% = 126-186vw */
+  background-size: 300vw 100vh;
+
+  /* fixed = coordenadas del viewport → todos los eventos comparten la misma luz */
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+
+  animation: chrome-global 4s linear infinite;
   z-index: 4;
   pointer-events: none;
   mix-blend-mode: screen;
