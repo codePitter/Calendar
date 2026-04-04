@@ -888,9 +888,16 @@ window.CalApp.Events = (function () {
     }
 
     const recurrence = $recurrence.value;
+
+    // Los eventos recurrentes en State.recurringEvents no tienen propiedad dateKey.
+    // Usamos _pendingDate (el dia desde el que se abrio el modal) como fallback.
+    const resolvedDateKey = _currentEvent
+      ? (_currentEvent.dateKey || _pendingDate)
+      : _pendingDate;
+
     const event = {
       id:        _currentEvent ? _currentEvent.id : generateId(),
-      dateKey:   _currentEvent ? _currentEvent.dateKey : _pendingDate,
+      dateKey:   resolvedDateKey,
       title,
       startTime: $inputStart.value,
       endTime:   $inputEnd.value,
@@ -902,8 +909,10 @@ window.CalApp.Events = (function () {
 
     if (recurrence !== 'none') {
       event.recurrence   = recurrence;
+      // originalDate: usar el campo del evento original si existe,
+      // luego el dateKey resuelto (nunca undefined).
       event.originalDate = _currentEvent
-        ? (_currentEvent.originalDate || _currentEvent.dateKey)
+        ? (_currentEvent.originalDate || resolvedDateKey)
         : _pendingDate;
       if ($endRecurrence && $endRecurrence.value) {
         event.endRecurrence = $endRecurrence.value;
@@ -911,7 +920,17 @@ window.CalApp.Events = (function () {
     }
 
     if (_currentEvent) {
-      State.updateEvent(event);
+      // Detectar si el evento original ERA recurrente
+      const wasRecurring = State.recurringEvents.some(e => e.id === _currentEvent.id);
+
+      if (wasRecurring && recurrence === 'none') {
+        // El usuario quito la recurrencia: eliminar de recurringEvents
+        // y guardar como evento regular en el dia que se estaba editando.
+        State.deleteEvent(resolvedDateKey, _currentEvent.id);
+        State.addEvent(event);
+      } else {
+        State.updateEvent(event);
+      }
     } else {
       State.addEvent(event);
     }
@@ -929,7 +948,7 @@ window.CalApp.Events = (function () {
       : `¿Eliminar el evento "${_currentEvent.title}"?`;
 
     if (!confirm(confirmMsg)) return;
-    State.deleteEvent(_currentEvent.dateKey, _currentEvent.id);
+    State.deleteEvent(_currentEvent.dateKey || _pendingDate, _currentEvent.id);
     closeModal();
     window.CalApp.renderAndBind();
   }
