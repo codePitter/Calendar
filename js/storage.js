@@ -1,6 +1,8 @@
 /**
  * storage.js — localStorage + sincronización con Supabase.
- *
+ * 
+ * ✨ FIX: Validación de integridad de datos al cargar desde Supabase
+ * 
  * ESTRATEGIA:
  *   • Lecturas: siempre desde localStorage (síncronas, instantáneas).
  *   • Escrituras: localStorage primero + Supabase en paralelo (no bloquea la UI).
@@ -80,10 +82,19 @@ window.CalApp.Storage = (function () {
       const db = this._db(), uid = this._uid();
       if (!db || !uid) return;
       try {
-        // Aplanar { dateKey: [evt, …] } → filas de Supabase
+        // ✨ FIX: Validar que no haya eventos con recurrencia antes de sincronizar
         const rows = [];
         for (const [dateKey, evts] of Object.entries(eventsMap)) {
           for (const evt of evts) {
+            // ⚠️ VALIDACIÓN: Eventos regulares NO deben tener recurrencia
+            if (evt.recurrence && evt.recurrence !== 'none') {
+              console.warn(
+                `[Sync] ⚠️ Evento ${evt.id} tiene recurrencia pero está en events regulares. ` +
+                `Se debe mover a recurringEvents primero.`
+              );
+              continue; // Saltar este evento - no sincronizarlo
+            }
+            
             rows.push({
               id:          evt.id,
               user_id:     uid,
@@ -167,6 +178,65 @@ window.CalApp.Storage = (function () {
   }
 
   /* ══════════════════════════════════════════════════════════
+     ✨ FIX: VALIDACIÓN DE INTEGRIDAD AL CARGAR DESDE SUPABASE
+  ══════════════════════════════════════════════════════════ */
+
+  /**
+   * ✨ Migrar eventos mal guardados: si encuentra eventos en State.events
+   * con campos de recurrencia, los mueve automáticamente a recurringEvents
+   */
+  function _validateAndMigrateEvents(eventsMap, recurringArray) {
+    const cleanedEvents = {};
+    const migratedToRecurring = [];
+    const existingRecurringIds = new Set(recurringArray.map(e => e.id));
+
+    for (const [dateKey, dateEvents] of Object.entries(eventsMap)) {
+      cleanedEvents[dateKey] = [];
+      
+      for (const evt of dateEvents) {
+        // Si el evento tiene recurrencia Y no está ya en recurringEvents
+        if (evt.recurrence && evt.recurrence !== 'none' && !existingRecurringIds.has(evt.id)) {
+          console.warn(
+            `[Storage] ⚠️ Evento "${evt.title}" tiene recurrencia pero estaba en events regulares. ` +
+            `Migrando automáticamente a recurringEvents.`
+          );
+          
+          // Migrar a recurrentes
+          migratedToRecurring.push({
+            id:            evt.id,
+            title:         evt.title,
+            startTime:     evt.startTime,
+            endTime:       evt.endTime,
+            desc:          evt.desc         || '',
+            color:         evt.color        || '#4f46e5',
+            imageUrl:      evt.imageUrl     || null,
+            important:     evt.important    || false,
+            recurrence:    evt.recurrence,
+            originalDate:  evt.originalDate || dateKey,
+            endRecurrence: evt.endRecurrence || null,
+          });
+          existingRecurringIds.add(evt.id);
+        } else if (evt.recurrence === 'none' || !evt.recurrence) {
+          // Evento regular válido
+          cleanedEvents[dateKey].push(evt);
+        }
+        // Si tiene recurrencia pero ya está en recurringEvents, ignorar (evitar duplicados)
+      }
+      
+      // Limpiar fechas vacías
+      if (cleanedEvents[dateKey].length === 0) {
+        delete cleanedEvents[dateKey];
+      }
+    }
+
+    return { 
+      cleanedEvents, 
+      migratedToRecurring,
+      totalMigrated: migratedToRecurring.length 
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════
      CARGA DESDE SUPABASE (llamado al hacer login)
   ══════════════════════════════════════════════════════════ */
 
@@ -196,15 +266,13 @@ window.CalApp.Storage = (function () {
           dateKey:    row.date_key,
         });
       }
-      // Escribir en localStorage SIN disparar sync (ya venimos de la nube)
-      try { localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(eventsMap)); } catch {}
 
       // Eventos recurrentes
       const { data: recData, error: recErr } = await db
         .from('recurring_events').select('*').eq('user_id', userId);
       if (recErr) throw recErr;
 
-      const recurring = (recData || []).map(row => ({
+      let recurring = (recData || []).map(row => ({
         id:            row.id,
         title:         row.title,
         startTime:     row.start_time,
@@ -217,7 +285,30 @@ window.CalApp.Storage = (function () {
         originalDate:  row.original_date,
         endRecurrence: row.end_recurrence,
       }));
-      try { localStorage.setItem(STORAGE_KEY_RECURRING, JSON.stringify(recurring)); } catch {}
+
+      // ✨ FIX: Validar y migrar eventos mal guardados
+      const { cleanedEvents, migratedToRecurring, totalMigrated } = 
+        _validateAndMigrateEvents(eventsMap, recurring);
+
+      if (totalMigrated > 0) {
+        console.log(`[Storage] ✅ Migrados ${totalMigrated} eventos a recurrentes automáticamente`);
+        recurring = [...recurring, ...migratedToRecurring];
+        
+        // Re-sincronizar datos corregidos a Supabase
+        try {
+          await _sync.events(cleanedEvents);
+          await _sync.recurring(recurring);
+          console.log('[Storage] ✅ Datos corregidos sincronizados con Supabase');
+        } catch (syncErr) {
+          console.error('[Storage] Error re-sincronizando:', syncErr);
+        }
+      }
+
+      // Escribir en localStorage
+      try { 
+        localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(cleanedEvents)); 
+        localStorage.setItem(STORAGE_KEY_RECURRING, JSON.stringify(recurring));
+      } catch {}
 
       // Preferencias
       const { data: settData } = await db
