@@ -1461,9 +1461,9 @@ a.ctx-link:hover { opacity: .75; }
    EVENTO TRANSPARENTE
    ════════════════════════════════════════════════════════════ */
 .cal-event.is-transparent {
-  background: rgba(255,255,255,0.55) !important;
+  background: rgba(255, 255, 255, 0) !important;
   border: 1.5px dashed #94a3b8 !important;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(0px);
   box-shadow: none;
 }
 
