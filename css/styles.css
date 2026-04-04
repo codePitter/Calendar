@@ -462,7 +462,7 @@ textarea { resize: vertical; }
   right: 2px;
   border: 2.5px solid #fbbf24;
   animation: important-glow 2s ease-in-out infinite,
-             chrome-hue 4s linear infinite;
+             chrome-hue 3s linear infinite;
   isolation: isolate;
 }
 
@@ -506,7 +506,7 @@ textarea { resize: vertical; }
   background-attachment: fixed;
   background-repeat: no-repeat;
 
-  animation: chrome-global 4s linear infinite;
+  animation: chrome-global 3s linear infinite;
   z-index: 4;
   pointer-events: none;
   mix-blend-mode: screen;
