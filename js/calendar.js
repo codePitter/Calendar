@@ -175,7 +175,7 @@ window.CalApp.Calendar = (function () {
 
       const markLabel = mark?.label
         ? `<span class="day-mark-label">${escapeHTML(mark.label)}</span>`
-        : '';
+        : `<span class="day-mark-label day-mark-ph" aria-hidden="true">&nbsp;</span>`;
 
       const showMonth  = (i === 0) || (d.getDate() === 1);
       const monthLabel = showMonth
@@ -370,12 +370,33 @@ window.CalApp.Calendar = (function () {
     body.scrollTop = 0;
   }
 
-  /* ── API pública ──────────────────────────────────────────── */
+  /* ── Sincronizar header con scrollbar del body ────────────── */
+
+  /**
+   * Cuando aparece la barra de desplazamiento vertical en .calendar-body,
+   * le resta ~15px al área de contenido. Aquí medimos ese ancho exacto y
+   * ajustamos el padding-right del header para que los 7 días queden
+   * perfectamente alineados con sus columnas, sin importar el SO o navegador.
+   */
+  function _syncHeaderScrollbar() {
+    const body   = document.getElementById('calendar-body');
+    const header = document.getElementById('calendar-header');
+    if (!body || !header) return;
+    // offsetWidth incluye el scrollbar; clientWidth es solo el contenido.
+    const sbW = body.offsetWidth - body.clientWidth;
+    header.style.paddingRight = `calc(0.75rem + ${sbW}px)`;
+  }
+
+  window.addEventListener('resize', _syncHeaderScrollbar);
 
   function render() {
     renderHeader();
     renderBody();
-    _fetchWeather(); // fire-and-forget; re-renderiza el header al completar
+    _fetchWeather();
+    // Sincronizar en el mismo tick y luego otra vez tras el primer paint
+    // (el scrollbar puede aparecer después de que el DOM se pinte).
+    _syncHeaderScrollbar();
+    requestAnimationFrame(_syncHeaderScrollbar);
   }
 
   setInterval(updateCurrentTimeLine, 30_000);

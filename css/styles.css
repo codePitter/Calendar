@@ -306,7 +306,6 @@ textarea { resize: vertical; }
   display: flex;
   overflow: auto;
   padding: 0 0.75rem 0.75rem 0.75rem;
-  scrollbar-gutter: stable; /* reserva siempre el espacio del scrollbar → headers alineados */
 }
 
 .calendar-body::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1675,6 +1674,13 @@ a.ctx-link:hover { opacity: .75; }
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+/* Placeholder invisible — reserva el mismo espacio que la etiqueta real */
+.day-mark-ph {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Indicador de "clickeable" — cursor pointer sobre el header */
