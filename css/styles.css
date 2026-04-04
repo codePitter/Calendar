@@ -207,6 +207,7 @@ textarea { resize: vertical; }
   flex-shrink: 0;
   background: var(--clr-bg);
   padding: 0.5rem 0.75rem 0 0.75rem;
+  padding-top: 0.1rem;
 }
 
 .cal-corner {
