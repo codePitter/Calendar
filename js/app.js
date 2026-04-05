@@ -75,7 +75,27 @@
     if (e.key === 't' || e.key === 'T')           { State.goToToday(); renderAndBind(); }
   });
 
-  /* ── Arranque ─────────────────────────────────────────── */
+  /* ── Guardar manualmente ──────────────────────────────── */
+
+  document.getElementById('btn-save-manual').addEventListener('click', () => {
+    const { Storage, State } = window.CalApp;
+
+    // Forzar persistencia de todo el estado actual
+    Storage.saveEvents(State.events);
+    Storage.saveRecurringEvents(State.recurringEvents);
+    Storage.saveMarkedDays(State.markedDays);
+    Storage.saveSettings({ endHour: State.endHour });
+
+    // Feedback visual en el botón
+    const btn = document.getElementById('btn-save-manual');
+    const prev = btn.textContent;
+    btn.textContent = '✓';
+    btn.classList.add('btn-save-manual--ok');
+    setTimeout(() => {
+      btn.textContent = prev;
+      btn.classList.remove('btn-save-manual--ok');
+    }, 1800);
+  });
 
   // 1. Render inicial del calendario
   renderAndBind();
