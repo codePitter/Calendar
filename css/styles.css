@@ -2076,8 +2076,10 @@ a.ctx-link:hover { opacity: .75; }
 
 /* Panel de preview: muestra imagen seleccionada o hint */
 .img-preview-panel {
-  flex: 1;
-  min-height: 140px;
+  flex: 0 0 auto;
+  height: 168px;      /* ≈ 60 % del alto anterior (flex:1 ≈ 280px) */
+  min-height: 84px;
+  max-height: 168px;
   border-radius: 8px;
   border: 1.5px solid var(--clr-border);
   overflow: hidden;

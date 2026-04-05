@@ -125,42 +125,28 @@ window.CalApp.Events = (function () {
   }
 
   /**
-   * Guarda imagen en recientes preservando la calidad original.
-   * - thumbUrl (param): URL de origen / clave de deduplicación
-   * - imageUrl (param): imagen en alta calidad (900×900 @88%) para el fondo del evento
-   *
-   * Lo que se persiste:
-   *   thumbUrl  → miniatura 120×90 @50% solo para mostrar en la grilla
-   *   imageUrl  → alta calidad para usar como fondo
-   *   srcUrl    → URL original para deduplicación
+   * OPTIMIZADO: Detecta si es URL local y NO la comprime
+   * Solo comprime imágenes web o subidas (dataURLs)
    */
-  async function addToRecentImages(srcUrl, imageUrl) {
-    const isLocalUrl = !imageUrl.startsWith('data:') &&
-                       !imageUrl.startsWith('http://') &&
-                       !imageUrl.startsWith('https://') &&
-                       !imageUrl.startsWith('blob:') &&
-                       !imageUrl.startsWith('/');
+  async function addToRecentImages(thumbUrl, dataUrl) {
+    // Si es URL local (no es dataURL y no es URL web), guardarla directo
+    const isLocalUrl = !dataUrl.startsWith('data:') && 
+                       !dataUrl.startsWith('http://') && 
+                       !dataUrl.startsWith('https://') &&
+                       !dataUrl.startsWith('blob:') &&
+                       !dataUrl.startsWith('/');
+    
+    const compressedThumb = isLocalUrl
+      ? thumbUrl  // Para imágenes locales: usar la URL como está
+      : dataUrl.startsWith('data:')
+        ? await compressThumb(dataUrl)  // Para dataURLs: comprimir
+        : dataUrl;  // Para URLs web: guardar como está
 
-    // Miniatura pequeña SOLO para mostrar en la grilla (no se usa como fondo)
-    let displayThumb;
-    if (isLocalUrl) {
-      displayThumb = imageUrl;                       // URL local → mostrar directo
-    } else if (imageUrl.startsWith('data:')) {
-      displayThumb = await compressThumb(imageUrl);  // 120×90 @50% solo para UI
-    } else {
-      displayThumb = imageUrl;                       // URL web → mostrar directo
-    }
-
-    // Deduplicar por srcUrl (estable) o por thumbUrl previo
-    const recents = loadRecentImages().filter(r =>
-      r.srcUrl !== srcUrl && r.thumbUrl !== displayThumb
-    );
-    recents.unshift({
-      thumbUrl: displayThumb,  // miniatura para la grilla
-      imageUrl: imageUrl,      // ← alta calidad para el evento (campo principal)
-      dataUrl:  imageUrl,      // compatibilidad con entradas antiguas en localStorage
-      srcUrl:   srcUrl,        // URL original para deduplicación
-      isLocal:  isLocalUrl,
+    const recents = loadRecentImages().filter(r => r.thumbUrl !== thumbUrl);
+    recents.unshift({ 
+      thumbUrl, 
+      dataUrl: compressedThumb,
+      isLocal: isLocalUrl  // ← NUEVO: Marcar si es local
     });
     if (recents.length > RECENT_IMG_MAX) recents.length = RECENT_IMG_MAX;
     saveRecentImages(recents);
@@ -208,6 +194,14 @@ window.CalApp.Events = (function () {
       <div class="cp-recents" id="cp-recents" style="display:none">
         <span class="cp-recents-label">Recientes</span>
         <div class="cp-recents-row" id="cp-recents-row"></div>
+      </div>
+      <div id="important-group" class="field-group img-important-group" style="margin-top:0.75rem">
+        <label>Prioridad</label>
+        <button type="button" id="btn-important-toggle"
+                class="btn-important-toggle" aria-pressed="false">
+          <span class="toggle-star">☆</span>
+          <span class="toggle-label">Marcar como importante</span>
+        </button>
       </div>
     `;
 
@@ -373,14 +367,6 @@ window.CalApp.Events = (function () {
             <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
               ${frameDotsHTML}
             </div>
-          </div>
-          <div id="important-group" class="field-group img-important-group">
-            <label>Prioridad</label>
-            <button type="button" id="btn-important-toggle"
-                    class="btn-important-toggle" aria-pressed="false">
-              <span class="toggle-star">☆</span>
-              <span class="toggle-label">Marcar como importante</span>
-            </button>
           </div>
         </div>
 
@@ -602,8 +588,6 @@ window.CalApp.Events = (function () {
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
         _updateImagePreview(compressed);
 
-        // thumbUrl = compressed (buena calidad, se usará para display)
-        // imageUrl = compressed (misma, es la que se guardará como fondo)
         await addToRecentImages(compressed, compressed);
 
       } catch (err) {
@@ -660,9 +644,6 @@ window.CalApp.Events = (function () {
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
         _updateImagePreview(compressed);
 
-        // Guardar en recientes:
-        // - thumbUrl param = dataUrl original (se usará solo si no se puede generar mini)
-        // - imageUrl param = compressed (900×900 @88% — buena calidad para el evento)
         await addToRecentImages(dataUrl, compressed);
 
       } catch (err) {
@@ -686,38 +667,31 @@ window.CalApp.Events = (function () {
     if (!recents.length) { section.style.display = 'none'; return; }
 
     section.style.display = 'block';
-    grid.innerHTML = recents.map(({ thumbUrl, imageUrl, dataUrl, isLocal }) => {
-      // thumbUrl: miniatura para la grilla; imageUrl/dataUrl: alta calidad (solo se usa al click)
-      const displaySrc = thumbUrl;
-      return `
-        <button type="button"
-                class="img-thumb${_selectedThumbUrl === thumbUrl ? ' selected' : ''}"
-                data-url="${thumbUrl}"
-                data-is-local="${isLocal ? '1' : '0'}"
-                title="Imagen reciente${isLocal ? ' (local)' : ''}">
-          <img src="${displaySrc}" alt="Reciente" loading="lazy" crossorigin="anonymous"
-               onerror="this.closest('.img-thumb').style.display='none'">
-          <div class="img-thumb-check">✓</div>
-        </button>
-      `;
-    }).join('');
+    grid.innerHTML = recents.map(({ thumbUrl, dataUrl, isLocal }) => `
+      <button type="button"
+              class="img-thumb${_selectedThumbUrl === thumbUrl ? ' selected' : ''}"
+              data-url="${thumbUrl}"
+              data-is-local="${isLocal ? '1' : '0'}"
+              title="Imagen reciente${isLocal ? ' (local)' : ''}">
+        <img src="${thumbUrl}" alt="Reciente" loading="lazy" crossorigin="anonymous"
+             onerror="this.closest('.img-thumb').style.display='none'">
+        <div class="img-thumb-check">✓</div>
+      </button>
+    `).join('');
 
-    // Click en reciente: usar imageUrl (alta calidad) como fondo del evento
+    // Click en reciente: usar directamente (no necesita procesamiento)
     grid.querySelectorAll('.img-thumb').forEach(thumb => {
       thumb.addEventListener('click', () => {
         const recent = recents.find(r => r.thumbUrl === thumb.dataset.url);
         if (!recent) return;
-
-        // imageUrl = alta calidad (campo nuevo); fallback a dataUrl para entradas antiguas
-        const fullQualityUrl = recent.imageUrl || recent.dataUrl;
-
-        const isLocal = recent.isLocal === true ||
-                        (!fullQualityUrl.startsWith('data:') &&
-                         !fullQualityUrl.startsWith('http'));
-
-        // Aplicar directamente sin re-procesar — ya está en buena calidad
+        
+        const isLocal = recent.isLocal === true || 
+                        (!recent.dataUrl.startsWith('data:') && 
+                         !recent.dataUrl.startsWith('http'));
+        
+        // Aplicar directamente sin procesamiento
         _selectedThumbUrl  = recent.thumbUrl;
-        _selectedImageUrl  = fullQualityUrl;  // ← alta calidad
+        _selectedImageUrl  = recent.dataUrl;  // Ya procesada (URL local o dataURL)
         _imgConvertPromise = null;
         _isLocalImage      = isLocal;
 
@@ -729,7 +703,7 @@ window.CalApp.Events = (function () {
         const barSpan = bar ? bar.querySelector('span') : null;
         if (bar) bar.style.display = 'flex';
         if (barSpan) barSpan.textContent = `🖼️ Imagen ${isLocal ? 'local' : 'reciente'} seleccionada`;
-        _updateImagePreview(fullQualityUrl);  // ← preview en alta calidad
+        _updateImagePreview(recent.dataUrl);
       });
     });
   }
