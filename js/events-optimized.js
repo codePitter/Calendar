@@ -312,56 +312,65 @@ window.CalApp.Events = (function () {
 
     container.innerHTML = `
       <div class="img-picker-layout">
-        <div class="img-recents-section" id="img-recents-section" style="display:none">
-          <div class="img-recents-label">🕐 Recientes</div>
-          <div class="img-recents-grid" id="img-recents-grid"></div>
-        </div>
-        <div class="img-local-section" id="img-local-section">
-          <div class="img-local-header">
-            <span class="img-recents-label">📁 Locales</span>
-            <div class="img-local-actions">
-              <span class="img-folder-name" id="img-folder-name"></span>
-              <button type="button" class="img-upload-label" id="img-pick-folder-btn">
-                📂 Elegir carpeta
-              </button>
-              <label class="img-upload-label" title="Subir imagen suelta">
-                📤 Subir
-                <input type="file" id="img-file-input" accept="image/*" style="display:none">
-              </label>
-              <input type="file" id="img-folder-input" webkitdirectory multiple
-                     accept="image/*" style="display:none">
+
+        <!-- ── Columna izquierda: controles ── -->
+        <div class="img-picker-left">
+          <div class="img-recents-section" id="img-recents-section" style="display:none">
+            <div class="img-recents-label">🕐 Recientes</div>
+            <div class="img-recents-grid" id="img-recents-grid"></div>
+          </div>
+          <div class="img-local-section" id="img-local-section">
+            <div class="img-local-header">
+              <span class="img-recents-label">📁 Locales</span>
+              <div class="img-local-actions">
+                <span class="img-folder-name" id="img-folder-name"></span>
+                <button type="button" class="img-upload-label" id="img-pick-folder-btn">
+                  📂 Elegir carpeta
+                </button>
+                <label class="img-upload-label" title="Subir imagen suelta">
+                  📤 Subir
+                  <input type="file" id="img-file-input" accept="image/*" style="display:none">
+                </label>
+                <input type="file" id="img-folder-input" webkitdirectory multiple
+                       accept="image/*" style="display:none">
+              </div>
+            </div>
+            <div class="img-local-grid" id="img-local-grid"></div>
+          </div>
+
+          <div class="img-selected-bar" id="img-selected-bar" style="display:none">
+            <span>Imagen seleccionada</span>
+            <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
+          </div>
+
+          <div class="img-search-row">
+            <input type="text" id="img-search-input"
+                   placeholder="Buscar: montañas, ciudad…"
+                   autocomplete="off">
+            <button type="button" class="img-search-btn" id="img-search-btn">🔍</button>
+          </div>
+          <div class="img-category-pills" id="img-category-pills">
+            ${IMG_CATEGORIES.map(c =>
+              `<button type="button" class="img-pill" data-q="${c.q}">${c.label}</button>`
+            ).join('')}
+          </div>
+          <div class="img-frame-row" id="img-frame-row">
+            <span class="img-frame-label">Marco</span>
+            <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
+              ${frameDotsHTML}
             </div>
           </div>
-          <div class="img-local-grid" id="img-local-grid"></div>
         </div>
-        
-        <div class="img-selected-bar" id="img-selected-bar" style="display:none">
-          <span>Imagen seleccionada</span>
-          <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
-        </div>
-        
-        <div class="img-search-row">
-          <input type="text" id="img-search-input"
-                 placeholder="Buscar: montañas, ciudad…"
-                 autocomplete="off">
-          <button type="button" class="img-search-btn" id="img-search-btn">🔍</button>
-        </div>
-        <div class="img-category-pills" id="img-category-pills">
-          ${IMG_CATEGORIES.map(c =>
-            `<button type="button" class="img-pill" data-q="${c.q}">${c.label}</button>`
-          ).join('')}
-        </div>
-        <div class="img-grid-wrap">
-          <div class="img-grid" id="img-grid">
-            <div class="img-hint">✨ Elegí una categoría o buscá</div>
+
+        <!-- ── Columna derecha: grilla de imágenes / hint ── -->
+        <div class="img-picker-right">
+          <div class="img-grid-wrap">
+            <div class="img-grid" id="img-grid">
+              <div class="img-hint">✨ Elegí una categoría o buscá</div>
+            </div>
           </div>
         </div>
-        <div class="img-frame-row" id="img-frame-row">
-          <span class="img-frame-label">Marco</span>
-          <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
-            ${frameDotsHTML}
-          </div>
-        </div>
+
       </div>
     `;
 
