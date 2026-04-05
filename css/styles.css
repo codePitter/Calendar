@@ -792,8 +792,8 @@ textarea { resize: vertical; }
 /* Color palette */
 .color-palette {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;   /* COLOR → RECIENTES → PRIORIDAD, uno debajo del otro */
+  gap: 0.75rem;
   padding-top: 2px;
 }
 
@@ -1620,7 +1620,6 @@ a.ctx-link:hover { opacity: .75; }
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.4rem;
   flex-wrap: wrap;
 }
 
@@ -2077,9 +2076,10 @@ a.ctx-link:hover { opacity: .75; }
 /* Panel de preview: muestra imagen seleccionada o hint */
 .img-preview-panel {
   flex: 0 0 auto;
-  height: 168px;      /* ≈ 60 % del alto anterior (flex:1 ≈ 280px) */
-  min-height: 84px;
-  max-height: 168px;
+  align-self: flex-start;         /* no estirar: el tamaño lo pone JS */
+  width: 100%;
+  height: 168px;                  /* estado inicial; JS lo sobreescribe con el aspect ratio real */
+  max-width: 100%;
   border-radius: 8px;
   border: 1.5px solid var(--clr-border);
   overflow: hidden;
@@ -2088,6 +2088,7 @@ a.ctx-link:hover { opacity: .75; }
   align-items: center;
   justify-content: center;
   position: relative;
+  transition: width 0.2s ease, height 0.2s ease;
 }
 
 .img-preview-empty {

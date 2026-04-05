@@ -195,14 +195,6 @@ window.CalApp.Events = (function () {
         <span class="cp-recents-label">Recientes</span>
         <div class="cp-recents-row" id="cp-recents-row"></div>
       </div>
-      <div id="important-group" class="field-group img-important-group" style="margin-top:0.75rem">
-        <label>Prioridad</label>
-        <button type="button" id="btn-important-toggle"
-                class="btn-important-toggle" aria-pressed="false">
-          <span class="toggle-star">☆</span>
-          <span class="toggle-label">Marcar como importante</span>
-        </button>
-      </div>
     `;
 
     $palette.addEventListener('click', e => {
@@ -367,6 +359,14 @@ window.CalApp.Events = (function () {
             <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
               ${frameDotsHTML}
             </div>
+          </div>
+          <div id="important-group" class="field-group img-important-group">
+            <label>Prioridad</label>
+            <button type="button" id="btn-important-toggle"
+                    class="btn-important-toggle" aria-pressed="false">
+              <span class="toggle-star">☆</span>
+              <span class="toggle-label">Marcar como importante</span>
+            </button>
           </div>
         </div>
 
@@ -794,17 +794,49 @@ window.CalApp.Events = (function () {
   /* ── Update image preview panel (right column) ──────────── */
 
   function _updateImagePreview(url) {
-    const img   = document.getElementById('img-preview-img');
-    const empty = document.getElementById('img-preview-empty');
-    if (!img) return;
+    const previewImg   = document.getElementById('img-preview-img');
+    const previewPanel = document.getElementById('img-preview-panel');
+    const empty        = document.getElementById('img-preview-empty');
+    if (!previewImg) return;
+
     if (url) {
-      img.src = url;
-      img.style.display = 'block';
+      // Ajustar el panel al aspect ratio de la imagen cuando cargue
+      previewImg.onload = () => {
+        const nw = previewImg.naturalWidth;
+        const nh = previewImg.naturalHeight;
+        if (!nw || !nh || !previewPanel) return;
+
+        // Ancho disponible del panel padre (columna derecha)
+        const maxW = previewPanel.parentElement?.clientWidth || 300;
+        const maxH = 280;   // altura máxima permitida en px
+        const ratio = nw / nh;
+
+        let pxH = maxH;
+        let pxW = Math.round(maxH * ratio);
+
+        // Si el ancho calculado supera el disponible, recalcular desde el ancho
+        if (pxW > maxW) {
+          pxW = maxW;
+          pxH = Math.round(maxW / ratio);
+        }
+
+        previewPanel.style.width  = pxW + 'px';
+        previewPanel.style.height = pxH + 'px';
+      };
+
+      previewImg.src = url;
+      previewImg.style.display = 'block';
       if (empty) empty.style.display = 'none';
     } else {
-      img.src = '';
-      img.style.display = 'none';
+      previewImg.onload = null;
+      previewImg.src = '';
+      previewImg.style.display = 'none';
       if (empty) empty.style.display = 'flex';
+      // Restaurar tamaño inicial del panel
+      if (previewPanel) {
+        previewPanel.style.width  = '100%';
+        previewPanel.style.height = '168px';
+      }
     }
   }
 
