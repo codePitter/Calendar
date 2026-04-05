@@ -311,53 +311,71 @@ window.CalApp.Events = (function () {
     ).join('');
 
     container.innerHTML = `
-      <div class="img-recents-section" id="img-recents-section" style="display:none">
-        <div class="img-recents-label">🕐 Recientes</div>
-        <div class="img-recents-grid" id="img-recents-grid"></div>
-      </div>
-      <div class="img-local-section" id="img-local-section">
-        <div class="img-local-header">
-          <span class="img-recents-label">📁 Locales</span>
-          <div class="img-local-actions">
-            <span class="img-folder-name" id="img-folder-name"></span>
-            <button type="button" class="img-upload-label" id="img-pick-folder-btn">
-              📂 Elegir carpeta
-            </button>
-            <label class="img-upload-label" title="Subir imagen suelta">
-              📤 Subir
-              <input type="file" id="img-file-input" accept="image/*" style="display:none">
-            </label>
-            <input type="file" id="img-folder-input" webkitdirectory multiple
-                   accept="image/*" style="display:none">
+      <div class="img-picker-layout">
+
+        <!-- Columna izquierda: controles + grid -->
+        <div class="img-picker-left">
+          <div class="img-recents-section" id="img-recents-section" style="display:none">
+            <div class="img-recents-label">🕐 Recientes</div>
+            <div class="img-recents-grid" id="img-recents-grid"></div>
+          </div>
+          <div class="img-local-section" id="img-local-section">
+            <div class="img-local-header">
+              <span class="img-recents-label">📁 Locales</span>
+              <div class="img-local-actions">
+                <span class="img-folder-name" id="img-folder-name"></span>
+                <button type="button" class="img-upload-label" id="img-pick-folder-btn">
+                  📂 Elegir carpeta
+                </button>
+                <label class="img-upload-label" title="Subir imagen suelta">
+                  📤 Subir
+                  <input type="file" id="img-file-input" accept="image/*" style="display:none">
+                </label>
+                <input type="file" id="img-folder-input" webkitdirectory multiple
+                       accept="image/*" style="display:none">
+              </div>
+            </div>
+            <div class="img-local-grid" id="img-local-grid"></div>
+          </div>
+          <div class="img-search-row">
+            <input type="text" id="img-search-input"
+                   placeholder="Buscar: montañas, ciudad…"
+                   autocomplete="off">
+            <button type="button" class="img-search-btn" id="img-search-btn">🔍</button>
+          </div>
+          <div class="img-category-pills" id="img-category-pills">
+            ${IMG_CATEGORIES.map(c =>
+              `<button type="button" class="img-pill" data-q="${c.q}">${c.label}</button>`
+            ).join('')}
+          </div>
+          <div class="img-grid-wrap">
+            <div class="img-grid" id="img-grid">
+              <div class="img-hint">✨ Elegí una categoría o buscá</div>
+            </div>
+          </div>
+          <div class="img-frame-row" id="img-frame-row">
+            <span class="img-frame-label">Marco</span>
+            <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
+              ${frameDotsHTML}
+            </div>
           </div>
         </div>
-        <div class="img-local-grid" id="img-local-grid"></div>
-      </div>
-      <div class="img-search-row">
-        <input type="text" id="img-search-input"
-               placeholder="Buscar en web: montañas, ciudad, flores…"
-               autocomplete="off">
-        <button type="button" class="img-search-btn" id="img-search-btn">🔍</button>
-      </div>
-      <div class="img-category-pills" id="img-category-pills">
-        ${IMG_CATEGORIES.map(c =>
-          `<button type="button" class="img-pill" data-q="${c.q}">${c.label}</button>`
-        ).join('')}
-      </div>
-      <div class="img-grid-wrap">
-        <div class="img-grid" id="img-grid">
-          <div class="img-hint">✨ Elige una categoría o escribe tu búsqueda</div>
+
+        <!-- Columna derecha: preview -->
+        <div class="img-picker-right">
+          <div class="img-preview-panel" id="img-preview-panel">
+            <div class="img-preview-empty" id="img-preview-empty">
+              <span class="img-preview-icon">🖼️</span>
+              <span>Vista previa</span>
+            </div>
+            <img class="img-preview-img" id="img-preview-img" src="" alt="Vista previa" style="display:none">
+          </div>
+          <div class="img-selected-bar" id="img-selected-bar" style="display:none">
+            <span>Imagen seleccionada</span>
+            <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
+          </div>
         </div>
-      </div>
-      <div class="img-frame-row" id="img-frame-row">
-        <span class="img-frame-label">Marco</span>
-        <div class="img-frame-palette" id="img-frame-palette" role="group" aria-label="Color de marco">
-          ${frameDotsHTML}
-        </div>
-      </div>
-      <div class="img-selected-bar" id="img-selected-bar" style="display:none">
-        <span>🖼️ Imagen seleccionada como fondo</span>
-        <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
+
       </div>
     `;
 
@@ -366,36 +384,25 @@ window.CalApp.Events = (function () {
       const dot = e.target.closest('.color-dot');
       if (!dot) return;
       _selectedColor = dot.dataset.color;
-      setActiveDot(_selectedColor); // sincroniza ambas paletas
+      setActiveDot(_selectedColor);
     });
 
-    // Renderizar imágenes locales de img/
     renderLocalImages(container);
 
-    // Botón "Elegir carpeta" (File System Access API + fallback)
     container.querySelector('#img-pick-folder-btn').addEventListener('click', pickLocalFolder);
-
-    // Fallback webkitdirectory (navegadores sin File System Access API)
     container.querySelector('#img-folder-input').addEventListener('change', _handleFolderInputChange);
 
-    // File input — subir imagen suelta del equipo
     container.querySelector('#img-file-input').addEventListener('change', e => {
       const file = e.target.files && e.target.files[0];
       if (!file || !file.type.startsWith('image/')) return;
-
       const reader = new FileReader();
-      reader.onload = ev => {
-        const dataUrl = ev.target.result;
-        selectUploadedImageByDataUrl(dataUrl, file.name);
-      };
+      reader.onload = ev => selectUploadedImageByDataUrl(ev.target.result, file.name);
       reader.readAsDataURL(file);
       e.target.value = '';
     });
 
-    // Mostrar recientes al abrir
     renderRecentImages();
 
-    // Category pills
     container.querySelectorAll('.img-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         container.querySelectorAll('.img-pill').forEach(p => p.classList.remove('active'));
@@ -406,7 +413,6 @@ window.CalApp.Events = (function () {
       });
     });
 
-    // Search
     const searchInput = document.getElementById('img-search-input');
     const searchBtn   = document.getElementById('img-search-btn');
 
@@ -424,7 +430,6 @@ window.CalApp.Events = (function () {
       if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
     });
 
-    // Clear button
     document.getElementById('img-clear-btn').addEventListener('click', clearImage);
   }
 
@@ -558,6 +563,7 @@ window.CalApp.Events = (function () {
     const barSpan = bar ? bar.querySelector('span') : null;
     if (bar) bar.style.display = 'flex';
     if (barSpan) barSpan.textContent = '⏳ Preparando imagen…';
+    _updateImagePreview(img.objectUrl);
 
     _imgConvertPromise = (async () => {
       try {
@@ -572,6 +578,7 @@ window.CalApp.Events = (function () {
         const compressed  = await compressImage(rawDataUrl);
         _selectedImageUrl = compressed;
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
+        _updateImagePreview(compressed);
 
         await addToRecentImages(compressed, compressed);
 
@@ -600,8 +607,9 @@ window.CalApp.Events = (function () {
     const barSpan = bar ? bar.querySelector('span') : null;
     if (bar) bar.style.display = 'flex';
     if (barSpan) barSpan.textContent = `🖼️ ${label || 'Imagen local seleccionada'}`;
+    _updateImagePreview(urlLocal);
 
-    addToRecentImages(urlLocal, urlLocal);  // Ambos parámetros son la URL
+    addToRecentImages(urlLocal, urlLocal);
   }
 
   /* ── OPTIMIZADO: Select uploaded image (dataURL) ── */
@@ -619,12 +627,14 @@ window.CalApp.Events = (function () {
     const barSpan = bar ? bar.querySelector('span') : null;
     if (bar) bar.style.display = 'flex';
     if (barSpan) barSpan.textContent = '⏳ Preparando imagen…';
+    _updateImagePreview(dataUrl);
 
     _imgConvertPromise = (async () => {
       try {
         const compressed  = await compressImage(dataUrl);
         _selectedImageUrl = compressed;
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
+        _updateImagePreview(compressed);
 
         await addToRecentImages(dataUrl, compressed);
 
@@ -685,6 +695,7 @@ window.CalApp.Events = (function () {
         const barSpan = bar ? bar.querySelector('span') : null;
         if (bar) bar.style.display = 'flex';
         if (barSpan) barSpan.textContent = `🖼️ Imagen ${isLocal ? 'local' : 'reciente'} seleccionada`;
+        _updateImagePreview(recent.dataUrl);
       });
     });
   }
@@ -741,6 +752,7 @@ window.CalApp.Events = (function () {
     const barSpan = bar ? bar.querySelector('span') : null;
     if (bar) bar.style.display = 'flex';
     if (barSpan) barSpan.textContent = '⏳ Preparando imagen…';
+    _updateImagePreview(url);
 
     _imgConvertPromise = (async () => {
       try {
@@ -753,10 +765,10 @@ window.CalApp.Events = (function () {
           reader.readAsDataURL(blob);
         });
 
-        // Comprimir antes de guardar (evita QuotaExceededError)
         const compressed  = await compressImage(rawDataUrl);
         _selectedImageUrl = compressed;
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
+        _updateImagePreview(compressed);
 
         await addToRecentImages(url, compressed);
 
@@ -771,6 +783,23 @@ window.CalApp.Events = (function () {
     await _imgConvertPromise;
   }
 
+  /* ── Update image preview panel (right column) ─────────── */
+
+  function _updateImagePreview(url) {
+    const previewImg   = document.getElementById('img-preview-img');
+    const previewEmpty = document.getElementById('img-preview-empty');
+    if (!previewImg || !previewEmpty) return;
+    if (url) {
+      previewImg.src           = url;
+      previewImg.style.display = 'block';
+      previewEmpty.style.display = 'none';
+    } else {
+      previewImg.src           = '';
+      previewImg.style.display = 'none';
+      previewEmpty.style.display = 'flex';
+    }
+  }
+
   /* ── Clear selected image ───────────────────────────────── */
 
   function clearImage() {
@@ -783,6 +812,17 @@ window.CalApp.Events = (function () {
 
     const bar = document.getElementById('img-selected-bar');
     if (bar) bar.style.display = 'none';
+
+    _updateImagePreview(null);
+  }
+
+  /* ── Switch modal tabs (Datos / Fondo) ─────────────────── */
+
+  function switchModalTab(tab) {
+    document.querySelectorAll('.modal-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.modal-tab-panel').forEach(p =>
+      p.classList.toggle('hidden', p.id !== `modal-panel-${tab}`));
   }
 
   /* ── Switch tab (Color / Imagen) ───────────────────────── */
@@ -840,6 +880,12 @@ window.CalApp.Events = (function () {
 
     $btnDelete.hidden = !existingEvent;
 
+    // Resetear al tab Datos
+    switchModalTab('datos');
+
+    // Actualizar preview lateral de imagen
+    _updateImagePreview(_selectedImageUrl);
+
     // Actualizar barra de imagen seleccionada
     const bar = document.getElementById('img-selected-bar');
     if (_selectedImageUrl) {
@@ -854,8 +900,8 @@ window.CalApp.Events = (function () {
       if (bar) bar.style.display = 'none';
     }
 
-    renderLocalImages();  // Refresh grid
-    renderRecentImages();  // Refresh recientes
+    renderLocalImages();
+    renderRecentImages();
 
     $backdrop.hidden = false;
     $inputTitle.focus();
@@ -1219,23 +1265,33 @@ function handleContextMenu(e) {
   function buildPresetDropdown() {
     if (document.getElementById('preset-dropdown')) return;
 
-    // Crear dropdown y anclarlo al wrapper del input título
-    const titleGroup = $inputTitle.closest('.field-group');
-    titleGroup.style.position = 'relative';
+    // Anchor dropdown to the title-wrapper (position:relative set in CSS)
+    const titleWrapper = $inputTitle.closest('.title-wrapper') || $inputTitle.parentElement;
 
     $presetDropdown = document.createElement('div');
     $presetDropdown.id        = 'preset-dropdown';
     $presetDropdown.className = 'preset-dropdown';
     $presetDropdown.hidden    = true;
-    titleGroup.appendChild($presetDropdown);
+    titleWrapper.appendChild($presetDropdown);
 
-    // Mostrar al hacer focus en el título
-    $inputTitle.addEventListener('focus', () => showPresetDropdown(''));
+    // Chevron toggles the dropdown
+    const chevron = document.getElementById('preset-chevron');
+    if (chevron) {
+      chevron.addEventListener('click', e => {
+        e.stopPropagation();
+        if ($presetDropdown.hidden) {
+          showPresetDropdown($inputTitle.value);
+        } else {
+          $presetDropdown.hidden = true;
+          chevron.classList.remove('is-open');
+        }
+      });
+    }
 
-    // Filtrar mientras se escribe, y auto-aplicar si hay match exacto
+    // Filter while typing (only if dropdown already open)
     $inputTitle.addEventListener('input', () => {
       const q = $inputTitle.value;
-      showPresetDropdown(q);
+      if (!$presetDropdown.hidden) showPresetDropdown(q);
       // Auto-aplicar si el título coincide exactamente con una plantilla
       const match = loadPresets().find(
         p => p.label.toLowerCase() === q.toLowerCase()
@@ -1245,7 +1301,11 @@ function handleContextMenu(e) {
 
     // Ocultar al perder foco (delay para permitir click en ítem)
     $inputTitle.addEventListener('blur', () =>
-      setTimeout(() => { if ($presetDropdown) $presetDropdown.hidden = true; }, 160)
+      setTimeout(() => {
+        if ($presetDropdown) $presetDropdown.hidden = true;
+        const ch = document.getElementById('preset-chevron');
+        if (ch) ch.classList.remove('is-open');
+      }, 160)
     );
   }
 
@@ -1264,6 +1324,8 @@ function handleContextMenu(e) {
 
     if (!filtered.length && q) {
       $presetDropdown.hidden = true;
+      const ch = document.getElementById('preset-chevron');
+      if (ch) ch.classList.remove('is-open');
       return;
     }
 
@@ -1288,6 +1350,8 @@ function handleContextMenu(e) {
     `;
 
     $presetDropdown.hidden = false;
+    const _ch = document.getElementById('preset-chevron');
+    if (_ch) _ch.classList.add('is-open');
 
     // Seleccionar plantilla
     $presetDropdown.querySelectorAll('.preset-dd-item').forEach(item => {
@@ -1297,6 +1361,8 @@ function handleContextMenu(e) {
         if (!preset) return;
         applyPreset(preset, /* fillTitle */ true);
         $presetDropdown.hidden = true;
+        const ch = document.getElementById('preset-chevron');
+        if (ch) ch.classList.remove('is-open');
         $inputTitle.focus();
       });
     });
@@ -1332,6 +1398,8 @@ function handleContextMenu(e) {
           thumbUrl: _selectedThumbUrl || null,
         });
         $presetDropdown.hidden = true;
+        const _chv = document.getElementById('preset-chevron');
+        if (_chv) _chv.classList.remove('is-open');
       });
     }
   }
@@ -1450,6 +1518,13 @@ function handleContextMenu(e) {
     }
     $btnImportant = document.getElementById('btn-important-toggle');
     $btnImportant.addEventListener('click', () => setImportant(!_isImportant));
+
+    /* ── Modal tabs ── */
+    document.getElementById('modal-tabs').addEventListener('click', e => {
+      const tab = e.target.closest('.modal-tab');
+      if (!tab) return;
+      switchModalTab(tab.dataset.tab);
+    });
 
     /* ── Listeners generales ── */
     document.getElementById('modal-close').addEventListener('click', closeModal);

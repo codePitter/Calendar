@@ -65,42 +65,59 @@
       </div>
 
       <div class="modal-body">
-        <div class="field-group">
-          <label for="evt-title">Título <span class="required">*</span></label>
-          <input type="text" id="evt-title" placeholder="Nombre del evento…" maxlength="80" autocomplete="off">
+
+        <!-- ── MODAL TABS ── -->
+        <div class="modal-tabs" id="modal-tabs">
+          <button class="modal-tab active" data-tab="datos">📋 Datos</button>
+          <button class="modal-tab"        data-tab="fondo">🎨 Fondo</button>
         </div>
 
-        <div class="field-row">
+        <!-- ── TAB 1: DATOS ── -->
+        <div class="modal-tab-panel" id="modal-panel-datos">
           <div class="field-group">
-            <label for="evt-start">Inicio</label>
-            <input type="time" id="evt-start" step="900">
+            <label for="evt-title">Título <span class="required">*</span></label>
+            <div class="title-wrapper">
+              <input type="text" id="evt-title" placeholder="Nombre del evento…" maxlength="80" autocomplete="off">
+              <button type="button" class="preset-chevron" id="preset-chevron" aria-label="Ver plantillas">&#8964;</button>
+            </div>
           </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label for="evt-start">Inicio</label>
+              <input type="time" id="evt-start" step="900">
+            </div>
+            <div class="field-group">
+              <label for="evt-end">Fin</label>
+              <input type="time" id="evt-end" step="900">
+            </div>
+          </div>
+
           <div class="field-group">
-            <label for="evt-end">Fin</label>
-            <input type="time" id="evt-end" step="900">
+            <label for="evt-recurrence">Repetir</label>
+            <select id="evt-recurrence" class="recurrence-select">
+              <option value="none">No repetir</option>
+              <option value="daily">Diario</option>
+              <option value="weekly">Semanal</option>
+              <option value="monthly">Mensual</option>
+              <option value="yearly">Anual</option>
+            </select>
+          </div>
+
+          <div class="field-group">
+            <label for="evt-desc">Descripción</label>
+            <textarea id="evt-desc" rows="2" placeholder="Detalles opcionales…"></textarea>
           </div>
         </div>
 
-        <div class="field-group">
-          <label for="evt-recurrence">Repetir</label>
-          <select id="evt-recurrence" class="recurrence-select">
-            <option value="none">No repetir</option>
-            <option value="daily">Diario</option>
-            <option value="weekly">Semanal</option>
-            <option value="monthly">Mensual</option>
-            <option value="yearly">Anual</option>
-          </select>
+        <!-- ── TAB 2: FONDO (color-palette → reemplazado por JS) ── -->
+        <div class="modal-tab-panel hidden" id="modal-panel-fondo">
+          <div class="field-group">
+            <label>Color</label>
+            <div class="color-palette" id="color-palette" role="group" aria-label="Seleccionar color"></div>
+          </div>
         </div>
 
-        <div class="field-group">
-          <label for="evt-desc">Descripción</label>
-          <textarea id="evt-desc" rows="2" placeholder="Detalles opcionales…"></textarea>
-        </div>
-
-        <div class="field-group">
-          <label>Color</label>
-          <div class="color-palette" id="color-palette" role="group" aria-label="Seleccionar color"></div>
-        </div>
       </div>
 
       <div class="modal-footer">
