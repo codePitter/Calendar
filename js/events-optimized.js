@@ -131,11 +131,11 @@ window.CalApp.Events = (function () {
   async function addToRecentImages(srcUrl, imageUrl) {
     // imageUrl = imagen en alta calidad (la que se usará como fondo del evento)
     // srcUrl   = URL original de origen (usada para deduplicar)
+    // FIX: las rutas con '/' inicial (ej: /img/photo.jpg) también son locales
     const isLocalUrl = !imageUrl.startsWith('data:') &&
                        !imageUrl.startsWith('http://') &&
                        !imageUrl.startsWith('https://') &&
-                       !imageUrl.startsWith('blob:') &&
-                       !imageUrl.startsWith('/');
+                       !imageUrl.startsWith('blob:');
 
     // Miniatura pequeña SOLO para mostrar en la grilla — nunca se usa como fondo
     let displayThumb;
@@ -598,7 +598,10 @@ window.CalApp.Events = (function () {
         if (barSpan) barSpan.textContent = '🖼️ Imagen seleccionada como fondo';
         _updateImagePreview(compressed);
 
-        await addToRecentImages(compressed, compressed);
+        // FIX: usar img.objectUrl como srcUrl estable para deduplicación correcta
+        // (si pasamos `compressed` como srcUrl, dos compresiones del mismo archivo
+        //  generan strings distintos y se duplican las entradas en recientes)
+        await addToRecentImages(img.objectUrl || img.name, compressed);
 
       } catch (err) {
         console.error('[Folder img]', err);
