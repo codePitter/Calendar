@@ -64,14 +64,14 @@
         <button class="modal-close" id="modal-close" aria-label="Cerrar modal">&times;</button>
       </div>
 
-      <div class="modal-body">
+      <!-- ── MODAL TABS (fuera del body para que no scrolleen) ── -->
+      <div class="modal-tabs" id="modal-tabs">
+        <button class="modal-tab active" data-tab="datos">📋 Datos</button>
+        <button class="modal-tab"        data-tab="color">🎨 Color</button>
+        <button class="modal-tab"        data-tab="imagen">🖼️ Imagen</button>
+      </div>
 
-        <!-- ── MODAL TABS ── -->
-        <div class="modal-tabs" id="modal-tabs">
-          <button class="modal-tab active" data-tab="datos">📋 Datos</button>
-          <button class="modal-tab"        data-tab="color">🎨 Color</button>
-          <button class="modal-tab"        data-tab="imagen">🖼️ Imagen</button>
-        </div>
+      <div class="modal-body">
 
         <!-- ── TAB 1: DATOS ── -->
         <div class="modal-tab-panel" id="modal-panel-datos">

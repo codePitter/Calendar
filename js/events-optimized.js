@@ -370,12 +370,17 @@ window.CalApp.Events = (function () {
           </div>
         </div>
 
-        <!-- ── Columna derecha: grilla de imágenes / hint ── -->
+        <!-- ── Columna derecha: preview + grilla de imágenes ── -->
         <div class="img-picker-right">
-          <div class="img-grid-wrap">
-            <div class="img-grid" id="img-grid">
-              <div class="img-hint">✨ Elegí una categoría o buscá</div>
+          <div class="img-preview-panel" id="img-preview-panel">
+            <div class="img-preview-empty" id="img-preview-empty">
+              <span class="img-preview-icon">✨</span>
+              <span>Elegí una categoría o buscá</span>
             </div>
+            <img class="img-preview-img" id="img-preview-img" alt="Vista previa">
+          </div>
+          <div class="img-grid-wrap">
+            <div class="img-grid" id="img-grid"></div>
           </div>
         </div>
 
@@ -786,10 +791,21 @@ window.CalApp.Events = (function () {
     await _imgConvertPromise;
   }
 
-  /* ── Update image preview panel (disabled - no preview) ──── */
+  /* ── Update image preview panel (right column) ──────────── */
 
   function _updateImagePreview(url) {
-    // No-op: preview panel eliminado
+    const img   = document.getElementById('img-preview-img');
+    const empty = document.getElementById('img-preview-empty');
+    if (!img) return;
+    if (url) {
+      img.src = url;
+      img.style.display = 'block';
+      if (empty) empty.style.display = 'none';
+    } else {
+      img.src = '';
+      img.style.display = 'none';
+      if (empty) empty.style.display = 'flex';
+    }
   }
 
   /* ── Clear selected image ───────────────────────────────── */
