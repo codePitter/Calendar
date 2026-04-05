@@ -845,6 +845,25 @@ window.CalApp.Events = (function () {
 
   /* ── Modal: open/close ──────────────────────────────────– */
 
+  /**
+   * Cambiar entre tabs del modal (Datos / Fondo)
+   */
+  function switchModalTab(tabName) {
+    const tabs = document.querySelectorAll('.modal-tab');
+    const panels = document.querySelectorAll('.modal-tab-panel');
+
+    tabs.forEach(t => {
+      const isActive = t.dataset.tab === tabName;
+      t.classList.toggle('active', isActive);
+    });
+
+    panels.forEach(p => {
+      const panelName = p.id.replace('modal-panel-', '');
+      const isVisible = panelName === tabName;
+      p.classList.toggle('hidden', !isVisible);
+    });
+  }
+
   function openModal(dateKey, hourStart, existingEvent = null) {
     _currentEvent = existingEvent || null;
     _pendingDate  = dateKey;
