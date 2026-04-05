@@ -1,15 +1,10 @@
 /**
  * storage.js — localStorage + sincronización con Supabase.
  *
- * ✨ FIX v2: Estrategia de MERGE al cargar desde Supabase.
- *   • Antes: Supabase SIEMPRE pisaba localStorage → se perdían cambios no sincronizados.
- *   • Ahora: se combinan local + nube (local gana en conflictos por ser más reciente).
- *     Si local tenía datos que no estaban en la nube, se re-sincronizan automáticamente.
- *
- * ESTRATEGIA:
- *   • Lecturas: siempre desde localStorage (síncronas, instantáneas).
- *   • Escrituras: localStorage primero + Supabase en paralelo (no bloquea la UI).
- *   • Al login: MERGE de Supabase + local → guarda merged → re-sube si había diferencias.
+ * ✨ FIX v3:
+ *   1. MERGE al cargar desde Supabase (local gana en conflictos).
+ *   2. Indicador visual de sync pendiente (dot amarillo pulsante).
+ *   3. Advertencia beforeunload si hay cambios sin guardar en la nube.
  *
  * Namespace global: window.CalApp.Storage
  */
@@ -19,44 +14,95 @@ window.CalApp.Storage = (function () {
   const { STORAGE_KEY_EVENTS, STORAGE_KEY_SETTINGS, STORAGE_KEY_RECURRING } =
     window.CalApp.CONFIG;
 
-  const STORAGE_KEY_MARKED_DAYS  = 'agenda2026_marked_days';
-  const STORAGE_KEY_LAST_MODIFIED = 'agenda2026_last_modified'; // ✨ nuevo
+  const STORAGE_KEY_MARKED_DAYS   = 'agenda2026_marked_days';
+  const STORAGE_KEY_LAST_MODIFIED = 'agenda2026_last_modified';
 
   /* ══════════════════════════════════════════════════════════
-     LOCAL STORAGE  (API sincrónica)
+     ✨ PENDING SYNC TRACKING
+  ══════════════════════════════════════════════════════════ */
+
+  let _pendingSyncs = 0;
+
+  function _syncStart() {
+    _pendingSyncs++;
+    _updateSyncDot('pending');
+  }
+
+  function _syncEnd(ok) {
+    _pendingSyncs = Math.max(0, _pendingSyncs - 1);
+    if (_pendingSyncs === 0) {
+      _updateSyncDot(ok ? 'ok' : 'err');
+    }
+  }
+
+  function _updateSyncDot(state) {
+    if (state === 'ok' || state === 'err') {
+      window.CalApp.Auth?.updateSyncStatus(state === 'ok');
+    }
+    const dot = document.querySelector('.sync-dot');
+    if (!dot) return;
+    dot.classList.remove('sync-ok', 'sync-err', 'sync-pending');
+    if      (state === 'ok')      dot.classList.add('sync-ok');
+    else if (state === 'err')     dot.classList.add('sync-err');
+    else if (state === 'pending') dot.classList.add('sync-pending');
+  }
+
+  // Estilo para dot amarillo pulsante
+  (function _injectPendingStyle() {
+    if (document.getElementById('sync-pending-style')) return;
+    const s = document.createElement('style');
+    s.id = 'sync-pending-style';
+    s.textContent = `
+      .sync-dot.sync-pending {
+        background: #fbbf24 !important;
+        box-shadow: 0 0 5px #fbbf2488 !important;
+        animation: sync-pulse 1s ease-in-out infinite;
+      }
+      @keyframes sync-pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: .5; transform: scale(.8); }
+      }
+    `;
+    document.head.appendChild(s);
+  })();
+
+  // Advertir si hay syncs pendientes al cerrar la pestaña
+  window.addEventListener('beforeunload', e => {
+    if (_pendingSyncs > 0) {
+      e.preventDefault();
+      e.returnValue = 'Hay cambios sincronizando con la nube. ¿Salir de todas formas?';
+    }
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     LOCAL STORAGE
   ══════════════════════════════════════════════════════════ */
 
   function loadEvents() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_EVENTS);
       return raw ? JSON.parse(raw) : {};
-    } catch (err) {
-      console.warn('[Storage] Error cargando eventos:', err);
-      return {};
-    }
+    } catch (err) { console.warn('[Storage] Error cargando eventos:', err); return {}; }
   }
 
   function saveEvents(events) {
     try { localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(events)); }
     catch (err) { console.error('[Storage] Error guardando eventos:', err); }
-    _touchModified();        // ✨ marcar timestamp de modificación local
-    _sync.events(events);    // fire-and-forget a Supabase
+    _touchModified();
+    _sync.events(events);
   }
 
   function loadRecurringEvents() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_RECURRING);
       return raw ? JSON.parse(raw) : [];
-    } catch (err) {
-      console.warn('[Storage] Error cargando recurrentes:', err);
-      return [];
-    }
+    } catch (err) { console.warn('[Storage] Error cargando recurrentes:', err); return []; }
   }
 
   function saveRecurringEvents(recurring) {
     try { localStorage.setItem(STORAGE_KEY_RECURRING, JSON.stringify(recurring)); }
     catch (err) { console.error('[Storage] Error guardando recurrentes:', err); }
-    _touchModified();          // ✨ marcar timestamp
+    _touchModified();
     _sync.recurring(recurring);
   }
 
@@ -64,10 +110,7 @@ window.CalApp.Storage = (function () {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_SETTINGS);
       return raw ? JSON.parse(raw) : {};
-    } catch (err) {
-      console.warn('[Storage] Error cargando settings:', err);
-      return {};
-    }
+    } catch (err) { console.warn('[Storage] Error cargando settings:', err); return {}; }
   }
 
   function saveSettings(settings) {
@@ -76,13 +119,10 @@ window.CalApp.Storage = (function () {
     _sync.settings(settings);
   }
 
-  /** ✨ Guarda el timestamp de la última modificación local */
   function _touchModified() {
-    try { localStorage.setItem(STORAGE_KEY_LAST_MODIFIED, Date.now().toString()); }
-    catch (_) {}
+    try { localStorage.setItem(STORAGE_KEY_LAST_MODIFIED, Date.now().toString()); } catch (_) {}
   }
 
-  /** ✨ Devuelve el timestamp de la última modificación local (ms), o 0 */
   function getLastModified() {
     const raw = localStorage.getItem(STORAGE_KEY_LAST_MODIFIED);
     return raw ? parseInt(raw, 10) : 0;
@@ -92,37 +132,25 @@ window.CalApp.Storage = (function () {
      ✨ MERGE HELPERS
   ══════════════════════════════════════════════════════════ */
 
-  /**
-   * Combina dos mapas de eventos { dateKey: [evt, ...] }.
-   * Local gana en conflictos de ID (es más reciente).
-   * Retorna { merged, hadLocalOnly } donde hadLocalOnly = true si local
-   * tenía eventos que la nube no tenía (datos no sincronizados).
-   */
   function _mergeEvents(cloudMap, localMap) {
-    // Construir índice de IDs en la nube
     const cloudIds = new Set();
     for (const evts of Object.values(cloudMap)) {
       for (const e of evts) cloudIds.add(e.id);
     }
 
-    // Empezar con todos los eventos de la nube
     const merged = {};
     for (const [dk, evts] of Object.entries(cloudMap)) {
       merged[dk] = evts.map(e => ({ ...e }));
     }
 
     let hadLocalOnly = false;
-
-    // Agregar/sobreescribir con los eventos locales
     for (const [dk, evts] of Object.entries(localMap)) {
       for (const localEvt of evts) {
         if (!cloudIds.has(localEvt.id)) {
-          // Evento local que no estaba en la nube → lo agregamos
           hadLocalOnly = true;
           if (!merged[dk]) merged[dk] = [];
           merged[dk].push({ ...localEvt });
         } else {
-          // El evento existe en ambos → local gana (reemplazar)
           if (!merged[dk]) merged[dk] = [];
           const idx = merged[dk].findIndex(e => e.id === localEvt.id);
           if (idx !== -1) merged[dk][idx] = { ...localEvt };
@@ -131,7 +159,6 @@ window.CalApp.Storage = (function () {
       }
     }
 
-    // Limpiar entradas vacías
     for (const dk of Object.keys(merged)) {
       if (!merged[dk] || merged[dk].length === 0) delete merged[dk];
     }
@@ -139,27 +166,19 @@ window.CalApp.Storage = (function () {
     return { merged, hadLocalOnly };
   }
 
-  /**
-   * Combina dos arrays de eventos recurrentes.
-   * Local gana en conflictos de ID.
-   */
   function _mergeRecurring(cloudArr, localArr) {
     const byId = {};
-    // Nube primero
     for (const e of cloudArr) byId[e.id] = { ...e };
-
     let hadLocalOnly = false;
-    // Local sobreescribe (más reciente)
     for (const e of localArr) {
       if (!byId[e.id]) hadLocalOnly = true;
       byId[e.id] = { ...e };
     }
-
     return { merged: Object.values(byId), hadLocalOnly };
   }
 
   /* ══════════════════════════════════════════════════════════
-     SUPABASE SYNC (async, no bloquea)
+     SUPABASE SYNC — con tracking de pendientes
   ══════════════════════════════════════════════════════════ */
 
   const _sync = {
@@ -169,12 +188,13 @@ window.CalApp.Storage = (function () {
     async events(eventsMap) {
       const db = this._db(), uid = this._uid();
       if (!db || !uid) return;
+      _syncStart();
       try {
         const rows = [];
         for (const [dateKey, evts] of Object.entries(eventsMap)) {
           for (const evt of evts) {
             if (evt.recurrence && evt.recurrence !== 'none') {
-              console.warn(`[Sync] ⚠️ Evento ${evt.id} tiene recurrencia en events regulares — omitido.`);
+              console.warn(`[Sync] ⚠️ Evento ${evt.id} tiene recurrencia — omitido de events.`);
               continue;
             }
             rows.push({
@@ -193,16 +213,17 @@ window.CalApp.Storage = (function () {
         }
         await db.from('events').delete().eq('user_id', uid);
         if (rows.length) await db.from('events').insert(rows);
-        window.CalApp.Auth?.updateSyncStatus(true);
+        _syncEnd(true);
       } catch (err) {
         console.error('[Sync] events:', err);
-        window.CalApp.Auth?.updateSyncStatus(false);
+        _syncEnd(false);
       }
     },
 
     async recurring(recurring) {
       const db = this._db(), uid = this._uid();
       if (!db || !uid) return;
+      _syncStart();
       try {
         const rows = recurring.map(evt => ({
           id:             evt.id,
@@ -220,10 +241,10 @@ window.CalApp.Storage = (function () {
         }));
         await db.from('recurring_events').delete().eq('user_id', uid);
         if (rows.length) await db.from('recurring_events').insert(rows);
-        window.CalApp.Auth?.updateSyncStatus(true);
+        _syncEnd(true);
       } catch (err) {
         console.error('[Sync] recurring:', err);
-        window.CalApp.Auth?.updateSyncStatus(false);
+        _syncEnd(false);
       }
     },
 
@@ -249,10 +270,7 @@ window.CalApp.Storage = (function () {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_MARKED_DAYS);
       return raw ? JSON.parse(raw) : {};
-    } catch (err) {
-      console.warn('[Storage] Error cargando días marcados:', err);
-      return {};
-    }
+    } catch (err) { console.warn('[Storage] Error cargando días marcados:', err); return {}; }
   }
 
   function saveMarkedDays(data) {
@@ -261,7 +279,7 @@ window.CalApp.Storage = (function () {
   }
 
   /* ══════════════════════════════════════════════════════════
-     VALIDACIÓN / MIGRACIÓN (igual que antes)
+     VALIDACIÓN / MIGRACIÓN
   ══════════════════════════════════════════════════════════ */
 
   function _validateAndMigrateEvents(eventsMap, recurringArray) {
@@ -273,7 +291,7 @@ window.CalApp.Storage = (function () {
       cleanedEvents[dateKey] = [];
       for (const evt of dateEvents) {
         if (evt.recurrence && evt.recurrence !== 'none' && !existingRecurringIds.has(evt.id)) {
-          console.warn(`[Storage] ⚠️ Evento "${evt.title}" migrado automáticamente a recurringEvents.`);
+          console.warn(`[Storage] ⚠️ "${evt.title}" migrado a recurringEvents.`);
           migratedToRecurring.push({
             id:            evt.id,
             title:         evt.title,
@@ -294,12 +312,11 @@ window.CalApp.Storage = (function () {
       }
       if (cleanedEvents[dateKey].length === 0) delete cleanedEvents[dateKey];
     }
-
     return { cleanedEvents, migratedToRecurring, totalMigrated: migratedToRecurring.length };
   }
 
   /* ══════════════════════════════════════════════════════════
-     ✨ CARGA DESDE SUPABASE — con MERGE (no sobreescribe)
+     ✨ CARGA DESDE SUPABASE — con MERGE
   ══════════════════════════════════════════════════════════ */
 
   async function loadFromSupabase(userId) {
@@ -307,11 +324,11 @@ window.CalApp.Storage = (function () {
     if (!db || !userId) return;
 
     try {
-      // ── 1. Guardar snapshot local ANTES de traer la nube ──────────────
+      // 1. Snapshot local ANTES de traer la nube
       const localEvents    = loadEvents();
       const localRecurring = loadRecurringEvents();
 
-      // ── 2. Traer datos de la nube ──────────────────────────────────────
+      // 2. Eventos regulares de la nube
       const { data: evData, error: evErr } = await db
         .from('events').select('*').eq('user_id', userId);
       if (evErr) throw evErr;
@@ -333,6 +350,7 @@ window.CalApp.Storage = (function () {
         });
       }
 
+      // 3. Recurrentes de la nube
       const { data: recData, error: recErr } = await db
         .from('recurring_events').select('*').eq('user_id', userId);
       if (recErr) throw recErr;
@@ -351,37 +369,34 @@ window.CalApp.Storage = (function () {
         endRecurrence: row.end_recurrence,
       }));
 
-      // ── 3. Validar/migrar eventos mal guardados ────────────────────────
+      // 4. Validar/migrar mal guardados
       const { cleanedEvents: cleanedCloud, migratedToRecurring, totalMigrated } =
         _validateAndMigrateEvents(cloudEventsMap, cloudRecurring);
-
-      let finalCloudRecurring = totalMigrated > 0
+      const finalCloudRecurring = totalMigrated > 0
         ? [...cloudRecurring, ...migratedToRecurring]
         : cloudRecurring;
 
-      // ── 4. ✨ MERGE: nube + local (local gana en conflictos) ───────────
-      const { merged: mergedEvents, hadLocalOnly: evLocalOnly } =
+      // 5. ✨ MERGE: nube + local (local gana)
+      const { merged: mergedEvents,    hadLocalOnly: evLocalOnly  } =
         _mergeEvents(cleanedCloud, localEvents);
-
       const { merged: mergedRecurring, hadLocalOnly: recLocalOnly } =
         _mergeRecurring(finalCloudRecurring, localRecurring);
 
       const hadUnsyncedLocal = evLocalOnly || recLocalOnly || totalMigrated > 0;
 
       if (hadUnsyncedLocal) {
-        console.log(
-          `[Storage] 🔀 Merge: local tenía datos no sincronizados. ` +
-          `${totalMigrated} migrados. Re-subiendo a Supabase…`
-        );
+        const evM = Object.values(mergedEvents).flat().length;
+        const reM = mergedRecurring.length;
+        console.log(`[Storage] 🔀 Merge: local tenía datos no sincronizados → merged: ${evM} eventos, ${reM} recurrentes.`);
       }
 
-      // ── 5. Guardar resultado merged en localStorage ───────────────────
+      // 6. Guardar merged en localStorage
       try {
         localStorage.setItem(STORAGE_KEY_EVENTS,    JSON.stringify(mergedEvents));
         localStorage.setItem(STORAGE_KEY_RECURRING, JSON.stringify(mergedRecurring));
       } catch {}
 
-      // ── 6. Si local tenía datos extra, re-sincronizar con la nube ─────
+      // 7. Re-sincronizar a la nube si local tenía datos extra
       if (hadUnsyncedLocal) {
         try {
           await _sync.events(mergedEvents);
@@ -392,7 +407,7 @@ window.CalApp.Storage = (function () {
         }
       }
 
-      // ── 7. Settings ────────────────────────────────────────────────────
+      // 8. Settings
       const { data: settData } = await db
         .from('user_settings').select('*').eq('user_id', userId).maybeSingle();
       if (settData) {
@@ -412,7 +427,6 @@ window.CalApp.Storage = (function () {
   ══════════════════════════════════════════════════════════ */
 
   return {
-    // Sync API (localStorage)
     loadEvents,
     saveEvents,
     loadSettings,
@@ -421,10 +435,8 @@ window.CalApp.Storage = (function () {
     saveRecurringEvents,
     loadMarkedDays,
     saveMarkedDays,
-    getLastModified,   // ✨ nuevo
-    // Cloud
+    getLastModified,
     loadFromSupabase,
-    // Expuesto para migración en auth.js / export.js
     syncNow: {
       events:    data => _sync.events(data),
       recurring: data => _sync.recurring(data),
