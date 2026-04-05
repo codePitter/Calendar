@@ -128,25 +128,35 @@ window.CalApp.Events = (function () {
    * OPTIMIZADO: Detecta si es URL local y NO la comprime
    * Solo comprime imágenes web o subidas (dataURLs)
    */
-  async function addToRecentImages(thumbUrl, dataUrl) {
-    // Si es URL local (no es dataURL y no es URL web), guardarla directo
-    const isLocalUrl = !dataUrl.startsWith('data:') && 
-                       !dataUrl.startsWith('http://') && 
-                       !dataUrl.startsWith('https://') &&
-                       !dataUrl.startsWith('blob:') &&
-                       !dataUrl.startsWith('/');
-    
-    const compressedThumb = isLocalUrl
-      ? thumbUrl  // Para imágenes locales: usar la URL como está
-      : dataUrl.startsWith('data:')
-        ? await compressThumb(dataUrl)  // Para dataURLs: comprimir
-        : dataUrl;  // Para URLs web: guardar como está
+  async function addToRecentImages(srcUrl, imageUrl) {
+    // imageUrl = imagen en alta calidad (la que se usará como fondo del evento)
+    // srcUrl   = URL original de origen (usada para deduplicar)
+    const isLocalUrl = !imageUrl.startsWith('data:') &&
+                       !imageUrl.startsWith('http://') &&
+                       !imageUrl.startsWith('https://') &&
+                       !imageUrl.startsWith('blob:') &&
+                       !imageUrl.startsWith('/');
 
-    const recents = loadRecentImages().filter(r => r.thumbUrl !== thumbUrl);
-    recents.unshift({ 
-      thumbUrl, 
-      dataUrl: compressedThumb,
-      isLocal: isLocalUrl  // ← NUEVO: Marcar si es local
+    // Miniatura pequeña SOLO para mostrar en la grilla — nunca se usa como fondo
+    let displayThumb;
+    if (isLocalUrl) {
+      displayThumb = imageUrl;                       // URL local → mostrar directo
+    } else if (imageUrl.startsWith('data:')) {
+      displayThumb = await compressThumb(imageUrl);  // 120×90 @50% solo para UI
+    } else {
+      displayThumb = imageUrl;                       // URL web → mostrar directo
+    }
+
+    // Deduplicar por srcUrl estable (para web) o por thumb generado
+    const recents = loadRecentImages().filter(r =>
+      r.srcUrl !== srcUrl && r.thumbUrl !== displayThumb
+    );
+    recents.unshift({
+      thumbUrl: displayThumb, // miniatura para la grilla
+      imageUrl: imageUrl,     // ← alta calidad para el evento (campo clave)
+      dataUrl:  imageUrl,     // compat. con entradas antiguas en localStorage
+      srcUrl:   srcUrl,       // URL original para deduplicación
+      isLocal:  isLocalUrl,
     });
     if (recents.length > RECENT_IMG_MAX) recents.length = RECENT_IMG_MAX;
     saveRecentImages(recents);
@@ -667,7 +677,7 @@ window.CalApp.Events = (function () {
     if (!recents.length) { section.style.display = 'none'; return; }
 
     section.style.display = 'block';
-    grid.innerHTML = recents.map(({ thumbUrl, dataUrl, isLocal }) => `
+    grid.innerHTML = recents.map(({ thumbUrl, isLocal }) => `
       <button type="button"
               class="img-thumb${_selectedThumbUrl === thumbUrl ? ' selected' : ''}"
               data-url="${thumbUrl}"
@@ -679,23 +689,22 @@ window.CalApp.Events = (function () {
       </button>
     `).join('');
 
-    // Click en reciente: usar directamente (no necesita procesamiento)
+    // Click en reciente: usar imageUrl (alta calidad) como fondo del evento
     grid.querySelectorAll('.img-thumb').forEach(thumb => {
       thumb.addEventListener('click', () => {
         const recent = recents.find(r => r.thumbUrl === thumb.dataset.url);
         if (!recent) return;
-        
-        const isLocal = recent.isLocal === true || 
-                        (!recent.dataUrl.startsWith('data:') && 
-                         !recent.dataUrl.startsWith('http'));
-        
-        // Aplicar directamente sin procesamiento
+
+        // imageUrl = alta calidad; fallback a dataUrl para entradas antiguas en localStorage
+        const fullUrl = recent.imageUrl || recent.dataUrl;
+        const isLocal = recent.isLocal === true ||
+                        (!fullUrl.startsWith('data:') && !fullUrl.startsWith('http'));
+
         _selectedThumbUrl  = recent.thumbUrl;
-        _selectedImageUrl  = recent.dataUrl;  // Ya procesada (URL local o dataURL)
+        _selectedImageUrl  = fullUrl;   // ← alta calidad
         _imgConvertPromise = null;
         _isLocalImage      = isLocal;
 
-        // Actualizar selección visual
         document.querySelectorAll('.img-thumb').forEach(t =>
           t.classList.toggle('selected', t.dataset.url === recent.thumbUrl));
 
@@ -703,7 +712,7 @@ window.CalApp.Events = (function () {
         const barSpan = bar ? bar.querySelector('span') : null;
         if (bar) bar.style.display = 'flex';
         if (barSpan) barSpan.textContent = `🖼️ Imagen ${isLocal ? 'local' : 'reciente'} seleccionada`;
-        _updateImagePreview(recent.dataUrl);
+        _updateImagePreview(fullUrl);   // ← preview en alta calidad
       });
     });
   }
@@ -794,17 +803,40 @@ window.CalApp.Events = (function () {
   /* ── Update image preview panel (right column) ──────────── */
 
   function _updateImagePreview(url) {
-    const img   = document.getElementById('img-preview-img');
-    const empty = document.getElementById('img-preview-empty');
-    if (!img) return;
+    const previewImg   = document.getElementById('img-preview-img');
+    const previewPanel = document.getElementById('img-preview-panel');
+    const empty        = document.getElementById('img-preview-empty');
+    if (!previewImg) return;
+
     if (url) {
-      img.src = url;
-      img.style.display = 'block';
+      previewImg.onload = () => {
+        const nw = previewImg.naturalWidth;
+        const nh = previewImg.naturalHeight;
+        if (!nw || !nh || !previewPanel) return;
+
+        const maxW = previewPanel.parentElement?.clientWidth || 300;
+        const maxH = 280;
+        const ratio = nw / nh;
+
+        let pxH = maxH;
+        let pxW = Math.round(maxH * ratio);
+        if (pxW > maxW) { pxW = maxW; pxH = Math.round(maxW / ratio); }
+
+        previewPanel.style.width  = pxW + 'px';
+        previewPanel.style.height = pxH + 'px';
+      };
+      previewImg.src = url;
+      previewImg.style.display = 'block';
       if (empty) empty.style.display = 'none';
     } else {
-      img.src = '';
-      img.style.display = 'none';
+      previewImg.onload = null;
+      previewImg.src = '';
+      previewImg.style.display = 'none';
       if (empty) empty.style.display = 'flex';
+      if (previewPanel) {
+        previewPanel.style.width  = '100%';
+        previewPanel.style.height = '160px';
+      }
     }
   }
 
