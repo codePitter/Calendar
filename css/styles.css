@@ -1854,7 +1854,7 @@ a.ctx-link:hover { opacity: .75; }
 }
 .dmp-btn-remove:hover { background: #fff1f1; }
 /* ════════════════════════════════════════════════════════════
-   MODAL TABS (Datos / Fondo)
+   MODAL TABS (Datos / Color / Imagen)
    ════════════════════════════════════════════════════════════ */
 
 .modal-tabs {
@@ -1868,9 +1868,9 @@ a.ctx-link:hover { opacity: .75; }
 
 .modal-tab {
   flex: 1;
-  padding: 0.4rem 0.5rem;
+  padding: 0.4rem 0.4rem;
   border-radius: 8px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 500;
   color: var(--clr-muted);
   background: transparent;
@@ -1878,6 +1878,7 @@ a.ctx-link:hover { opacity: .75; }
   cursor: pointer;
   transition: all 0.15s;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .modal-tab.active {
@@ -1941,106 +1942,8 @@ a.ctx-link:hover { opacity: .75; }
 }
 
 /* ════════════════════════════════════════════════════════════
-   IMAGE PICKER — DOS COLUMNAS (left: grid | right: preview)
+   IMAGE PICKER — estilos legacy removidos (ver bloque final)
    ════════════════════════════════════════════════════════════ */
-
-.img-picker-layout {
-  display: flex;
-  gap: 0.65rem;
-  align-items: flex-start;
-}
-
-.img-picker-left {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.img-picker-right {
-  width: 136px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-/* Preview panel */
-.img-preview-panel {
-  width: 100%;
-  aspect-ratio: 3/4;
-  border-radius: 8px;
-  border: 1.5px solid var(--clr-border);
-  overflow: hidden;
-  background: var(--clr-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.img-preview-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  font-size: 0.68rem;
-  color: var(--clr-muted);
-  text-align: center;
-  padding: 0.5rem;
-}
-
-.img-preview-icon { font-size: 1.6rem; opacity: 0.4; }
-
-.img-preview-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: none;
-}
-
-/* Selected bar in right column — compact vertical layout */
-.img-picker-right .img-selected-bar {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
-  padding: 0.4rem 0.5rem;
-  margin-top: 0;
-}
-
-.img-picker-right .img-selected-bar span {
-  font-size: 0.68rem;
-  line-height: 1.3;
-}
-
-.img-picker-right .img-clear-btn {
-  align-self: stretch;
-  text-align: center;
-  padding: 0.2rem 0.4rem;
-  border-radius: 5px;
-  border: 1px solid #c7d2fe;
-  font-size: 0.68rem;
-}
-
-/* Reduce grid columns inside narrow left column */
-.img-picker-left .img-grid {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.img-picker-left .img-recents-grid,
-.img-picker-left .img-local-grid {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-/* Adjust grid height for two-column layout */
-.img-picker-left .img-grid-wrap {
-  max-height: 150px;
-}
 /* ═══════════════════════════════════════════════════════════════
    MODAL TABS (Datos / Fondo)
    ═══════════════════════════════════════════════════════════════ */
@@ -2136,26 +2039,32 @@ a.ctx-link:hover { opacity: .75; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   IMAGE PICKER LAYOUT (dos columnas: controles | grilla)
+   IMAGE PICKER LAYOUT — dos columnas: controles | grilla
    ═══════════════════════════════════════════════════════════════ */
 
 .img-picker-layout {
   display: flex;
   flex-direction: row;
-  gap: 0.65rem;
-  align-items: flex-start;
+  gap: 0.75rem;
+  align-items: stretch;   /* columnas de igual altura */
 }
 
-/* Columna izquierda: controles */
+/* Columna izquierda: recientes, locales, buscador, pills, marco, prioridad */
 .img-picker-left {
-  flex: 0 0 52%;
+  flex: 0 0 50%;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-/* Columna derecha: grilla / hint */
+/* Grillas compactas (3 col) dentro de la columna izquierda */
+.img-picker-left .img-recents-grid,
+.img-picker-left .img-local-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Columna derecha: hint / grilla de resultados */
 .img-picker-right {
   flex: 1;
   min-width: 0;
@@ -2164,30 +2073,29 @@ a.ctx-link:hover { opacity: .75; }
 }
 
 .img-picker-right .img-grid-wrap {
+  flex: 1;
   max-height: none;
-  min-height: 220px;
-  height: 100%;
+  min-height: 240px;
 }
 
 .img-picker-right .img-grid {
   grid-template-columns: repeat(2, 1fr);
-  min-height: 220px;
   height: 100%;
+  min-height: 240px;
 }
 
-/* Grillas compactas en columna izquierda */
-.img-picker-left .img-recents-grid,
-.img-picker-left .img-local-grid {
-  grid-template-columns: repeat(3, 1fr);
+/* Prioridad dentro del layout izquierdo — quitar el gap extra de field-group */
+.img-important-group {
+  margin-top: 0.1rem;
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MODAL WIDTH ADJUSTMENT
+   MODAL WIDTH — más ancho para las dos columnas
    ═══════════════════════════════════════════════════════════════ */
 
 .modal {
   width: 90vw;
-  max-width: 680px;
+  max-width: 700px;
 }
 
 .modal-body {

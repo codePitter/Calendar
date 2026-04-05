@@ -360,6 +360,14 @@ window.CalApp.Events = (function () {
               ${frameDotsHTML}
             </div>
           </div>
+          <div id="important-group" class="field-group img-important-group">
+            <label>Prioridad</label>
+            <button type="button" id="btn-important-toggle"
+                    class="btn-important-toggle" aria-pressed="false">
+              <span class="toggle-star">☆</span>
+              <span class="toggle-label">Marcar como importante</span>
+            </button>
+          </div>
         </div>
 
         <!-- ── Columna derecha: grilla de imágenes / hint ── -->
@@ -809,22 +817,11 @@ window.CalApp.Events = (function () {
       p.classList.toggle('hidden', p.id !== `modal-panel-${tab}`));
   }
 
-  /* ── Switch tab (Color / Imagen) ───────────────────────── */
+  /* ── Switch tab (Color / Imagen) → delega en modal tabs ─── */
 
   function switchBgTab(tab) {
-    const colorPanel = document.getElementById('bg-panel-color');
-    const imgPanel   = document.getElementById('bg-panel-imagen');
-    const tabs       = document.querySelectorAll('.bg-tab');
-
-    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-
-    if (tab === 'color') {
-      colorPanel.classList.remove('hidden');
-      imgPanel.classList.add('hidden');
-    } else {
-      colorPanel.classList.add('hidden');
-      imgPanel.classList.remove('hidden');
-    }
+    // Color e Imagen son ahora tabs del modal principal
+    switchModalTab(tab === 'color' ? 'color' : 'imagen');
   }
 
   /* ── Modal: open/close ──────────────────────────────────– */
@@ -1466,59 +1463,14 @@ function handleContextMenu(e) {
     }
     $endRecurrence = document.getElementById('evt-end-recurrence');
 
-    /* ── Transformar el grupo de color en: tabs + color panel + imagen panel ── */
-    const originalColorGroup = document.getElementById('color-palette').closest('.field-group');
-    const bgGroup = document.createElement('div');
-    bgGroup.className = 'field-group';
-    bgGroup.id = 'bg-group';
-    bgGroup.innerHTML = `
-      <div class="bg-field-header">
-        <label>Fondo</label>
-        <div class="bg-tabs" id="bg-tabs">
-          <button type="button" class="bg-tab active" data-tab="color">🎨 Color</button>
-          <button type="button" class="bg-tab"        data-tab="imagen">🖼️ Imagen</button>
-        </div>
-      </div>
-      <div id="bg-panel-color" class="bg-panel">
-        <div class="color-palette" id="color-palette"
-             role="group" aria-label="Seleccionar color"></div>
-      </div>
-      <div id="bg-panel-imagen" class="bg-panel hidden"></div>
-    `;
-
-    originalColorGroup.replaceWith(bgGroup);
-
-    // Re-set palette reference (DOM was replaced)
+    /* ── Color palette: usar el panel del modal directamente ── */
     $palette       = document.getElementById('color-palette');
-    $bgPanelColor  = document.getElementById('bg-panel-color');
-    $bgPanelImagen = document.getElementById('bg-panel-imagen');
+    $bgPanelImagen = document.getElementById('modal-panel-imagen');
 
     buildColorPalette();
     buildImagePicker($bgPanelImagen);
 
-    // Tab switcher
-    document.getElementById('bg-tabs').addEventListener('click', e => {
-      const tab = e.target.closest('.bg-tab');
-      if (!tab) return;
-      switchBgTab(tab.dataset.tab);
-    });
-
-    /* ── Toggle de importancia ── */
-    if (!document.getElementById('important-group')) {
-      const colorBgGroup   = document.getElementById('bg-group');
-      const importantGroup = document.createElement('div');
-      importantGroup.id        = 'important-group';
-      importantGroup.className = 'field-group';
-      importantGroup.innerHTML = `
-        <label>Prioridad</label>
-        <button type="button" id="btn-important-toggle"
-                class="btn-important-toggle" aria-pressed="false">
-          <span class="toggle-star">☆</span>
-          <span class="toggle-label">Marcar como importante</span>
-        </button>
-      `;
-      colorBgGroup.insertAdjacentElement('afterend', importantGroup);
-    }
+    /* ── Toggle de importancia (ya está en el DOM via buildImagePicker) ── */
     $btnImportant = document.getElementById('btn-important-toggle');
     $btnImportant.addEventListener('click', () => setImportant(!_isImportant));
 

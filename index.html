@@ -69,7 +69,8 @@
         <!-- ── MODAL TABS ── -->
         <div class="modal-tabs" id="modal-tabs">
           <button class="modal-tab active" data-tab="datos">📋 Datos</button>
-          <button class="modal-tab"        data-tab="fondo">🎨 Fondo</button>
+          <button class="modal-tab"        data-tab="color">🎨 Color</button>
+          <button class="modal-tab"        data-tab="imagen">🖼️ Imagen</button>
         </div>
 
         <!-- ── TAB 1: DATOS ── -->
@@ -110,12 +111,17 @@
           </div>
         </div>
 
-        <!-- ── TAB 2: FONDO (color-palette → reemplazado por JS) ── -->
-        <div class="modal-tab-panel hidden" id="modal-panel-fondo">
+        <!-- ── TAB 2: COLOR ── -->
+        <div class="modal-tab-panel hidden" id="modal-panel-color">
           <div class="field-group">
             <label>Color</label>
             <div class="color-palette" id="color-palette" role="group" aria-label="Seleccionar color"></div>
           </div>
+        </div>
+
+        <!-- ── TAB 3: IMAGEN ── -->
+        <div class="modal-tab-panel hidden" id="modal-panel-imagen">
+          <!-- Populated by events-optimized.js → buildImagePicker() -->
         </div>
 
       </div>
