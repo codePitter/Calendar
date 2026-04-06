@@ -329,10 +329,10 @@ window.CalApp.Events = (function () {
     ).join('');
 
     container.innerHTML = `
-      <div class="img-picker-layout" style="display:flex;gap:12px;align-items:flex-start;">
+      <div class="img-picker-layout">
 
-        <!-- ── Columna izquierda: controles (scrolleable) ── -->
-        <div class="img-picker-left" style="flex:1;min-width:0;overflow-y:auto;max-height:420px;padding-right:4px;">
+        <!-- ── Única columna: controles + grilla ── -->
+        <div class="img-picker-left">
           <div class="img-recents-section" id="img-recents-section" style="display:none">
             <div class="img-recents-label">🕐 Recientes</div>
             <div class="img-recents-grid" id="img-recents-grid"></div>
@@ -378,26 +378,6 @@ window.CalApp.Events = (function () {
               ${frameDotsHTML}
             </div>
           </div>
-        </div>
-
-        <!-- ── Columna derecha: preview sticky + grilla ── -->
-        <div class="img-picker-right" style="width:260px;flex-shrink:0;position:sticky;top:0;align-self:flex-start;">
-
-          <!-- Preview: oculto hasta que haya imagen seleccionada -->
-          <div id="img-preview-panel"
-               style="display:none;border-radius:10px;overflow:hidden;
-                      background:#f4f4f5;border:1px solid #e5e7eb;margin-bottom:8px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                        padding:6px 10px;border-bottom:1px solid #e5e7eb;background:#fff;">
-              <span style="font-size:11px;font-weight:600;color:#888;
-                           text-transform:uppercase;letter-spacing:.04em;">Vista previa</span>
-              <button type="button" id="img-preview-close"
-                      style="background:none;border:none;cursor:pointer;font-size:13px;
-                             color:#aaa;padding:0;line-height:1;" aria-label="Cerrar">✕</button>
-            </div>
-            <img id="img-preview-img" class="img-preview-img" alt="Vista previa"
-                 style="width:100%;height:auto;max-height:240px;object-fit:contain;display:block;">
-          </div>
 
           <!-- Grilla de imágenes web -->
           <div class="img-grid-wrap">
@@ -407,6 +387,9 @@ window.CalApp.Events = (function () {
 
       </div>
     `;
+
+    // Crear panel de preview acoplado al modal (fixed, posicionado junto al modal)
+    _buildSidePreview();
 
     // Frame color palette listener — sincroniza con _selectedColor
     container.querySelector('#img-frame-palette').addEventListener('click', e => {
@@ -811,28 +794,113 @@ window.CalApp.Events = (function () {
     await _imgConvertPromise;
   }
 
-  /* ── Update image preview panel (columna derecha, sticky) ── */
+  /* ── Side preview: panel fijo acoplado al borde derecho del modal ── */
+
+  function _buildSidePreview() {
+    if (document.getElementById('img-side-preview')) return;
+
+    const panel = document.createElement('div');
+    panel.id = 'img-side-preview';
+
+    Object.assign(panel.style, {
+      position:      'fixed',
+      display:       'none',
+      flexDirection: 'column',
+      width:         '200px',
+      background:    '#ffffff',
+      borderRadius:  '0 12px 12px 0',
+      boxShadow:     '4px 0 24px rgba(0,0,0,0.15)',
+      border:        '1px solid #e5e7eb',
+      borderLeft:    'none',
+      overflow:      'hidden',
+      zIndex:        '10002',
+      transition:    'opacity .18s ease, transform .18s ease',
+      opacity:       '0',
+      transform:     'translateX(-6px)',
+    });
+
+    panel.innerHTML = `
+      <div id="img-side-header" style="
+        display:flex; align-items:center; justify-content:space-between;
+        padding:8px 10px 6px; background:#f9fafb;
+        border-bottom:1px solid #e5e7eb;">
+        <span style="font-size:10px;font-weight:700;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;">Vista previa</span>
+        <button type="button" id="img-side-close"
+                style="background:none;border:none;cursor:pointer;
+                       font-size:14px;color:#d1d5db;padding:0;line-height:1;"
+                aria-label="Cerrar">✕</button>
+      </div>
+      <div style="
+        background:#f4f4f5; display:flex; align-items:center;
+        justify-content:center; min-height:120px; padding:6px;">
+        <img id="img-preview-img"
+             style="max-width:100%;max-height:260px;object-fit:contain;
+                    border-radius:6px;display:block;"
+             alt="Vista previa">
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    panel.querySelector('#img-side-close').addEventListener('click', () => {
+      _hideSidePreview();
+    });
+  }
+
+  function _positionSidePreview() {
+    const panel   = document.getElementById('img-side-preview');
+    const backdrop = document.getElementById('modal-backdrop');
+    if (!panel || !backdrop) return;
+
+    // Buscar el dialog del modal (primer hijo directo con posición)
+    const dialog = backdrop.querySelector('[id*="modal"], .modal, dialog') ||
+                   backdrop.firstElementChild;
+    if (!dialog) return;
+
+    const rect = dialog.getBoundingClientRect();
+    const panelH = panel.offsetHeight || 300;
+    const vpH    = window.innerHeight;
+
+    // Acoplar al borde derecho del modal, alineado verticalmente al centro del modal
+    let top = rect.top + (rect.height / 2) - (panelH / 2);
+    top = Math.max(16, Math.min(top, vpH - panelH - 16));
+
+    panel.style.left = (rect.right) + 'px';
+    panel.style.top  = top + 'px';
+  }
+
+  function _showSidePreview(url) {
+    const panel = document.getElementById('img-side-preview');
+    const img   = document.getElementById('img-preview-img');
+    if (!panel || !img) return;
+
+    img.src = url;
+    panel.style.display   = 'flex';
+    _positionSidePreview();
+
+    // Trigger transition
+    requestAnimationFrame(() => {
+      panel.style.opacity   = '1';
+      panel.style.transform = 'translateX(0)';
+    });
+  }
+
+  function _hideSidePreview() {
+    const panel = document.getElementById('img-side-preview');
+    if (!panel) return;
+    panel.style.opacity   = '0';
+    panel.style.transform = 'translateX(-6px)';
+    setTimeout(() => { panel.style.display = 'none'; }, 180);
+  }
+
+  /* ── Update image preview (orquesta show/hide del panel lateral) ── */
 
   function _updateImagePreview(url) {
-    const previewPanel = document.getElementById('img-preview-panel');
-    const previewImg   = document.getElementById('img-preview-img');
-    if (!previewPanel || !previewImg) return;
-
     if (url) {
-      previewImg.src             = url;
-      previewPanel.style.display = 'block';
-
-      // Listener para botón cerrar preview (sin quitar imagen)
-      const closeBtn = document.getElementById('img-preview-close');
-      if (closeBtn && !closeBtn._bound) {
-        closeBtn._bound = true;
-        closeBtn.addEventListener('click', () => {
-          previewPanel.style.display = 'none';
-        });
-      }
+      _showSidePreview(url);
     } else {
-      previewImg.src             = '';
-      previewPanel.style.display = 'none';
+      _hideSidePreview();
     }
   }
 
@@ -955,6 +1023,7 @@ window.CalApp.Events = (function () {
     $backdrop.hidden = true;
     _currentEvent = null;
     clearImage();
+    _hideSidePreview();
   }
 
   /* ── Save event ────────────────────────────────────────── */
