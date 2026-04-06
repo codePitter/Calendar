@@ -153,12 +153,14 @@
   <script src="js/events-optimized.js"></script>
   <script src="js/app.js"></script>
   <script src="js/export.js"></script>
+  <script src="js/weather-modal.js"></script>
   <!-- 4. Auth (después de app.js para que renderAndBind esté disponible) -->
   <script src="js/auth.js"></script>
   <script>
     // Arrancar autenticación una vez que todos los módulos están listos
     window.CalApp.Auth.init().catch(console.error);
     window.CalApp.Export.init();
+    window.CalApp.WeatherModal.init();
   </script>
 </body>
 </html>
