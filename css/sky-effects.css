@@ -1,0 +1,130 @@
+/**
+ * sky-effects.css — Estilos y animaciones para los efectos dinámicos del cielo
+ * en la columna del día actual del calendario.
+ */
+
+/* ── Configuración base de la columna del día actual ── */
+.cal-day-col.is-today {
+  position: relative;
+  overflow: hidden;
+  transition: background 0.8s ease-in-out;
+}
+
+/* ── Elementos de efectos del cielo ── */
+.sky-effect {
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── ESTRELLAS ── */
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+/* ── LUNA (glow pulsante) ── */
+@keyframes moonGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(255,255,255,0.5),
+      inset -8px -8px 12px rgba(0,0,0,0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 35px rgba(255,255,255,0.8),
+      0 0 50px rgba(255,255,255,0.4),
+      inset -8px -8px 12px rgba(0,0,0,0.15);
+  }
+}
+
+/* ── LLUVIA ── */
+@keyframes rainFall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+  }
+  90% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(calc(100vh + 50px));
+    opacity: 0;
+  }
+}
+
+/* ── RELÁMPAGO (flash) ── */
+@keyframes lightningFlash {
+  0%, 90%, 92%, 94%, 100% {
+    background: rgba(255,255,255,0);
+  }
+  91%, 93% {
+    background: rgba(255,255,255,0.4);
+  }
+}
+
+/* ── NIEVE ── */
+@keyframes snowFall {
+  0% {
+    transform: translateY(-20px) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(calc(100vh + 30px)) translateX(40px);
+    opacity: 0;
+  }
+}
+
+/* ── NIEBLA (drift horizontal) ── */
+@keyframes fogDrift {
+  0% {
+    transform: translateX(-20%);
+  }
+  100% {
+    transform: translateX(10%);
+  }
+}
+
+/* ── NUBES (drift horizontal lento) ── */
+@keyframes cloudDrift {
+  0% {
+    transform: translateX(-30%);
+  }
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+/* ── Mejoras visuales adicionales ── */
+
+/* Asegurar que los eventos se vean sobre los efectos del cielo */
+.cal-event {
+  position: relative;
+  z-index: 20 !important;
+}
+
+/* Hacer que la línea de hora actual se vea sobre los efectos del cielo */
+.current-time-line {
+  z-index: 25 !important;
+}
+
+/* Asegurar que las líneas de hora se vean correctamente */
+.cal-hour-line,
+.cal-half-line {
+  position: relative;
+  z-index: 1;
+}
