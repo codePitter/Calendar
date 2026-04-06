@@ -379,7 +379,10 @@ window.CalApp.Events = (function () {
             </div>
           </div>
 
-          <!-- Grilla de imágenes web -->
+        </div>
+
+        <!-- ── Columna derecha: grilla de imágenes web ── -->
+        <div class="img-picker-right">
           <div class="img-grid-wrap">
             <div class="img-grid" id="img-grid"></div>
           </div>
