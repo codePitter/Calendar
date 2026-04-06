@@ -85,22 +85,7 @@ window.CalApp.Events = (function () {
   function loadRecentImages() {
     try {
       const raw = localStorage.getItem(RECENT_IMG_KEY);
-      if (!raw) return [];
-      const all = JSON.parse(raw);
-
-      // Migración: descartar entradas antiguas (pre-fix) que solo tienen
-      // el thumb degradado (120×90 @50%) como imageUrl.
-      // Criterio: entrada válida si tiene imageUrl propio, es local, o el
-      // srcUrl es una URL web recuperable (no un dataUrl).
-      const valid = all.filter(r =>
-        r.imageUrl ||
-        r.isLocal  ||
-        (r.srcUrl && !r.srcUrl.startsWith('data:'))
-      );
-      if (valid.length !== all.length) {
-        try { localStorage.setItem(RECENT_IMG_KEY, JSON.stringify(valid)); } catch {}
-      }
-      return valid;
+      return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   }
 
@@ -344,10 +329,10 @@ window.CalApp.Events = (function () {
     ).join('');
 
     container.innerHTML = `
-      <div class="img-picker-layout">
+      <div class="img-picker-layout" style="align-items: flex-start;">
 
-        <!-- ── Columna izquierda: controles ── -->
-        <div class="img-picker-left">
+        <!-- ── Columna izquierda: controles (scrollable) ── -->
+        <div class="img-picker-left" style="overflow-y: auto; max-height: 420px; padding-right: 4px;">
           <div class="img-recents-section" id="img-recents-section" style="display:none">
             <div class="img-recents-label">🕐 Recientes</div>
             <div class="img-recents-grid" id="img-recents-grid"></div>
@@ -395,8 +380,8 @@ window.CalApp.Events = (function () {
           </div>
         </div>
 
-        <!-- ── Columna derecha: preview + grilla de imágenes ── -->
-        <div class="img-picker-right">
+        <!-- ── Columna derecha: preview + grilla de imágenes (sticky) ── -->
+        <div class="img-picker-right" style="position: sticky; top: 0; align-self: flex-start;">
           <div class="img-preview-panel" id="img-preview-panel">
             <div class="img-preview-empty" id="img-preview-empty">
               <span class="img-preview-icon">✨</span>
@@ -706,39 +691,14 @@ window.CalApp.Events = (function () {
 
     // Click en reciente: usar imageUrl (alta calidad) como fondo del evento
     grid.querySelectorAll('.img-thumb').forEach(thumb => {
-      thumb.addEventListener('click', async () => {
+      thumb.addEventListener('click', () => {
         const recent = recents.find(r => r.thumbUrl === thumb.dataset.url);
         if (!recent) return;
 
         // imageUrl = alta calidad; fallback a dataUrl para entradas antiguas en localStorage
-        let fullUrl = recent.imageUrl || recent.dataUrl;
+        const fullUrl = recent.imageUrl || recent.dataUrl;
         const isLocal = recent.isLocal === true ||
                         (!fullUrl.startsWith('data:') && !fullUrl.startsWith('http'));
-
-        // Si la entrada no tiene imageUrl de alta calidad pero sí una srcUrl web,
-        // re-descargar y recomprimir en alta calidad, y actualizar localStorage.
-        if (!recent.imageUrl && recent.srcUrl && recent.srcUrl.startsWith('http')) {
-          const bar     = document.getElementById('img-selected-bar');
-          const barSpan = bar ? bar.querySelector('span') : null;
-          if (bar) bar.style.display = 'flex';
-          if (barSpan) barSpan.textContent = '⏳ Recuperando imagen en alta calidad…';
-          try {
-            const response   = await fetch(recent.srcUrl, { mode: 'cors' });
-            const blob       = await response.blob();
-            const rawDataUrl = await new Promise((res, rej) => {
-              const reader = new FileReader();
-              reader.onloadend = () => res(reader.result);
-              reader.onerror   = rej;
-              reader.readAsDataURL(blob);
-            });
-            fullUrl = await compressImage(rawDataUrl);
-            // Actualizar entrada en localStorage con el imageUrl recuperado
-            await addToRecentImages(recent.srcUrl, fullUrl);
-          } catch (err) {
-            console.warn('[Recents] No se pudo recuperar imagen:', err);
-            // Usar lo que tengamos como fallback
-          }
-        }
 
         _selectedThumbUrl  = recent.thumbUrl;
         _selectedImageUrl  = fullUrl;   // ← alta calidad
@@ -849,12 +809,6 @@ window.CalApp.Events = (function () {
     if (!previewImg) return;
 
     if (url) {
-      // FIX: aplicar object-fit antes de asignar src para evitar distorsión
-      // mientras onload no haya calculado las dimensiones exactas
-      previewImg.style.objectFit  = 'contain';
-      previewImg.style.width      = '100%';
-      previewImg.style.height     = '100%';
-
       previewImg.onload = () => {
         const nw = previewImg.naturalWidth;
         const nh = previewImg.naturalHeight;
@@ -870,10 +824,6 @@ window.CalApp.Events = (function () {
 
         previewPanel.style.width  = pxW + 'px';
         previewPanel.style.height = pxH + 'px';
-        // Asegurar que la img llene el panel sin estirar
-        previewImg.style.width     = '100%';
-        previewImg.style.height    = '100%';
-        previewImg.style.objectFit = 'contain';
       };
       previewImg.src = url;
       previewImg.style.display = 'block';
