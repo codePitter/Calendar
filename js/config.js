@@ -76,6 +76,10 @@ window.CalApp.CONFIG = Object.freeze({
    *   { src: 'img/abstracto.png', label: '🎨 Abstracto' },
    */
   LOCAL_IMAGES: [
-    // { src: 'img/fondo1.jpg', label: 'Fondo 1' },
+    { src: 'img/work.jpg', label: 'Trabajo' },
+    { src: 'img/student.jpg', label: 'Universidad' },
+    { src: 'img/hobbies.jpg', label: 'Personal' },
+    { src: 'img/social.jpg', label: 'Social' },
+    { src: 'img/relax.jpg', label: 'Descanso' },
   ],
 });
