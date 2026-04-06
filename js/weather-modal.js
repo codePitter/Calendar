@@ -47,7 +47,6 @@ window.CalApp.WeatherModal = (function () {
     if (_coordsCache) return Promise.resolve(_coordsCache);
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        // Fallback: Buenos Aires / Rosario area
         resolve({ latitude: -32.9468, longitude: -60.6393 });
         return;
       }
@@ -56,7 +55,7 @@ window.CalApp.WeatherModal = (function () {
           _coordsCache = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
           resolve(_coordsCache);
         },
-        () => resolve({ latitude: -32.9468, longitude: -60.6393 }) // fallback silencioso
+        () => resolve({ latitude: -32.9468, longitude: -60.6393 })
       );
     });
   }
@@ -81,9 +80,40 @@ window.CalApp.WeatherModal = (function () {
   function ensureModal() {
     if (document.getElementById('wm-backdrop')) return;
 
-    // Inyectar estilos
     const style = document.createElement('style');
     style.textContent = `
+      /* ── Hover effect on weather emoji ── */
+      .day-weather-icon,
+      [class*="weather-icon"],
+      .day-weather .day-weather-icon {
+        display: inline-block;
+        cursor: pointer;
+        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+                    filter 0.2s ease;
+        transform-origin: center bottom;
+        will-change: transform;
+        border-radius: 4px;
+      }
+      .day-weather-icon:hover,
+      [class*="weather-icon"]:hover {
+        transform: scale(1.65) translateY(-2px);
+        filter: drop-shadow(0 3px 6px rgba(0,0,0,0.25));
+        z-index: 10;
+        position: relative;
+      }
+
+      /* Also make the whole .day-weather clickable-looking */
+      .day-weather {
+        cursor: pointer;
+      }
+      .day-weather:hover .day-weather-icon {
+        transform: scale(1.65) translateY(-2px);
+        filter: drop-shadow(0 3px 6px rgba(0,0,0,0.25));
+        position: relative;
+        z-index: 10;
+      }
+
+      /* ── Backdrop ── */
       #wm-backdrop {
         position: fixed; inset: 0; z-index: 9000;
         background: rgba(0,0,0,.45);
@@ -184,7 +214,6 @@ window.CalApp.WeatherModal = (function () {
     `;
     document.head.appendChild(style);
 
-    // Backdrop + modal
     const backdrop = document.createElement('div');
     backdrop.id = 'wm-backdrop';
     backdrop.hidden = true;
@@ -218,7 +247,7 @@ window.CalApp.WeatherModal = (function () {
   /* ── Render hourly rows ──────────────────────────────────── */
   function renderRows(data) {
     const h   = data.hourly;
-    const times = h.time;              // ["2026-04-06T00:00", ...]
+    const times = h.time;
     const temp  = h.temperature_2m;
     const precip = h.precipitation_probability;
     const hum   = h.relativehumidity_2m;
@@ -231,13 +260,12 @@ window.CalApp.WeatherModal = (function () {
     </div>`;
 
     times.forEach((t, i) => {
-      const hour = t.slice(11, 16);   // "HH:MM"
+      const hour = t.slice(11, 16);
       const info = wmoInfo(codes[i]);
       const precipitation = precip[i] != null ? `${precip[i]}%` : '—';
       const humidity = hum[i] != null ? `${hum[i]}%` : '—';
       const temperature = temp[i] != null ? `${Math.round(temp[i])}°` : '—';
 
-      // Colorear según temperatura
       const hotness = temp[i] > 30 ? '#ef4444' : temp[i] > 22 ? '#f97316' : temp[i] > 15 ? '#10b981' : '#3b82f6';
 
       html += `
@@ -283,20 +311,28 @@ window.CalApp.WeatherModal = (function () {
 
   /* ── Attach click listeners via delegation ───────────────── */
   function init() {
-    // Escuchar clics en el header del calendario.
-    // Los emojis de clima tienen clase .day-weather o similar,
-    // y su columna padre (.day-col) tiene data-date="YYYY-MM-DD".
-    // Usamos un selector amplio para capturar distintas implementaciones.
-    document.getElementById('calendar-header').addEventListener('click', e => {
-      const weatherEl = e.target.closest('[class*="weather"], .day-weather-badge, .weather-icon, .day-temp');
+    const calHeader = document.getElementById('calendar-header');
+    if (!calHeader) return;
+
+    calHeader.addEventListener('click', e => {
+      // Buscar si el clic fue sobre un elemento de clima
+      const weatherEl = e.target.closest(
+        '.day-weather, .day-weather-icon, [class*="weather-icon"], [class*="weather-badge"], .day-temp'
+      );
       if (!weatherEl) return;
 
-      // Buscar la fecha en el atributo data-date del col padre o del propio elemento
-      const col = weatherEl.closest('[data-date]');
-      const dateStr = col?.dataset?.date || weatherEl.dataset?.date;
+      // ── FIX: el atributo en el HTML es data-date-key, no data-date ──
+      // Buscar hacia arriba hasta encontrar el elemento con la fecha,
+      // probando tanto data-date como data-date-key.
+      const col = weatherEl.closest('[data-date], [data-date-key]');
+      if (!col) return;
+
+      const dateStr = col.dataset.date || col.dataset.dateKey;
       if (!dateStr) return;
 
+      // Detener propagación para no disparar otros handlers (ej: color modal)
       e.stopPropagation();
+      e.preventDefault();
 
       // Construir etiqueta legible: "Lunes 6 de Abril"
       const [y, m, d] = dateStr.split('-').map(Number);
@@ -306,7 +342,7 @@ window.CalApp.WeatherModal = (function () {
       });
 
       open(dateStr, label.charAt(0).toUpperCase() + label.slice(1));
-    });
+    }, true); // ← useCapture: true para interceptar ANTES que otros listeners
   }
 
   return { init, open, close };
