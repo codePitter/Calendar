@@ -331,7 +331,7 @@ window.CalApp.Events = (function () {
     container.innerHTML = `
       <div class="img-picker-layout">
 
-        <!-- ── Única columna: controles + grilla ── -->
+        <!-- ── Columna izquierda: recientes + locales ── -->
         <div class="img-picker-left">
           <div class="img-recents-section" id="img-recents-section" style="display:none">
             <div class="img-recents-label">🕐 Recientes</div>
@@ -355,7 +355,10 @@ window.CalApp.Events = (function () {
             </div>
             <div class="img-local-grid" id="img-local-grid"></div>
           </div>
+        </div>
 
+        <!-- ── Columna derecha: búsqueda + grilla de imágenes web ── -->
+        <div class="img-picker-right">
           <div class="img-selected-bar" id="img-selected-bar" style="display:none">
             <span>Imagen seleccionada</span>
             <button type="button" class="img-clear-btn" id="img-clear-btn">✕ Quitar</button>
@@ -379,10 +382,6 @@ window.CalApp.Events = (function () {
             </div>
           </div>
 
-        </div>
-
-        <!-- ── Columna derecha: grilla de imágenes web ── -->
-        <div class="img-picker-right">
           <div class="img-grid-wrap">
             <div class="img-grid" id="img-grid"></div>
           </div>
