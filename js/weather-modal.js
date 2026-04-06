@@ -763,6 +763,7 @@ window.CalApp.WeatherModal = (function () {
       .wfx-day-bg {
         position: absolute; inset: 0; z-index: 1;
         pointer-events: none; overflow: hidden;
+        border-radius: inherit;
         transition: background 3s ease;
       }
 
