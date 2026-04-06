@@ -301,19 +301,26 @@ window.CalApp.WeatherModal = (function () {
     });
   }
 
-  function _makeRainParticles(W, H, heavy) {
-    var n = heavy ? 38 : 16;
+  function _makeRainParticles(W, H, heavy, night) {
+    var n = heavy ? 55 : 28;
     var result = [];
     for (var i = 0; i < n; i++) {
+      /* Night rain: longer streaks, higher opacity (more visible on dark bg) */
+      var baseLen  = heavy ? 16 + Math.random() * 14 : 10 + Math.random() * 10;
+      var baseA    = night
+        ? (heavy ? .45 + Math.random() * .35 : .32 + Math.random() * .28)
+        : (heavy ? .28 + Math.random() * .24 : .18 + Math.random() * .20);
       result.push({
         x: Math.random() * W, y: Math.random() * H,
-        len: heavy ? 10 + Math.random() * 8 : 6 + Math.random() * 6,
-        wx:  heavy ? -2.5 : -1.5,
-        vy:  heavy ? 6 + Math.random() * 5 : 3.5 + Math.random() * 3,
-        vx:  heavy ? -1.2 : -.7,
-        w:   heavy ? 1.3 : .9,
-        r: 140, g: 185, b: 255,
-        a: .22 + Math.random() * .28,
+        len: baseLen,
+        wx:  heavy ? -3.5 : -2.0,          /* endpoint x-offset (angle) */
+        vy:  heavy ? 4 + Math.random() * 3.5 : 2.5 + Math.random() * 2,   /* slower → longer visible streaks */
+        vx:  heavy ? -1.6 : -0.9,
+        w:   heavy ? 1.5 : 1.0,
+        r: night ? 170 : 140,
+        g: night ? 210 : 185,
+        b: 255,
+        a: baseA,
       });
     }
     return result;
@@ -342,7 +349,8 @@ window.CalApp.WeatherModal = (function () {
     canvas.height = layer.offsetHeight || 60;
     var ctx       = canvas.getContext('2d');
     var W = canvas.width, H = canvas.height;
-    var particles = type === 'snow' ? _makeSnowParticles(W, H) : _makeRainParticles(W, H, heavy);
+    var night = !!(layer.dataset && layer.dataset.night === '1');
+    var particles = type === 'snow' ? _makeSnowParticles(W, H) : _makeRainParticles(W, H, heavy, night);
     _canvasEntries.add({ canvas: canvas, ctx: ctx, particles: particles, type: type });
     _startRaf();
   }
@@ -935,6 +943,7 @@ window.CalApp.WeatherModal = (function () {
     var bg = document.createElement('div');
     bg.className = 'wfx-day-bg';
     bg.style.background = sky.grad;
+    if (sky.stars) bg.dataset.night = '1';   /* flag for canvas rain opacity */
     col.insertBefore(bg, col.firstChild);
 
     /* ── Stars + Moon (night / dusk) ── */
@@ -975,13 +984,14 @@ window.CalApp.WeatherModal = (function () {
     var ov = sky.overlay;
 
     if (ov === 'rain-light') {
-      var r = document.createElement('div'); r.className = 'wfx-day-rain'; bg.appendChild(r);
+      /* Use canvas particles — CSS gradient tiles look like TV static */
+      _attachCanvas(bg, 'rain', false);
     }
     if (ov === 'rain-heavy') {
-      var rh = document.createElement('div'); rh.className = 'wfx-day-rain-hv'; bg.appendChild(rh);
+      _attachCanvas(bg, 'rain', true);
     }
     if (ov === 'storm') {
-      var rs = document.createElement('div'); rs.className = 'wfx-day-rain-hv'; bg.appendChild(rs);
+      _attachCanvas(bg, 'storm', true);
       var fl = document.createElement('div');
       fl.className = 'wfx-day-lightning';
       fl.style.setProperty('--wfx-ld', (Math.random() * 2).toFixed(1) + 's');
