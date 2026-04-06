@@ -672,13 +672,366 @@ window.CalApp.WeatherModal = (function () {
     });
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     TODAY COLUMN — Sky atmosphere (hour × weather)
+     ══════════════════════════════════════════════════════════════ */
+
+  function _todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* Sky gradient per hour for Argentina April (sunrise ~7h, sunset ~19h) */
+  function _baseSky(h) {
+    if (h <  5) return { t:'#03030e', b:'#07071a', stars:true,  phase:'night'   };
+    if (h <  6) return { t:'#0c0720', b:'#1a0c38', stars:true,  phase:'predawn' };
+    if (h <  7) return { t:'#220d52', b:'#c04420', stars:false, phase:'dawn'    };
+    if (h <  8) return { t:'#e06018', b:'#ffb840', stars:false, phase:'sunrise' };
+    if (h <  9) return { t:'#42a0d8', b:'#b8deff', stars:false, phase:'morning' };
+    if (h < 13) return { t:'#2882c8', b:'#78c2f8', stars:false, phase:'day'     };
+    if (h < 16) return { t:'#3488c0', b:'#88c8f0', stars:false, phase:'day'     };
+    if (h < 18) return { t:'#4090b8', b:'#a0c8e0', stars:false, phase:'afternoon'};
+    if (h < 19) return { t:'#d86020', b:'#ffa840', stars:false, phase:'golden'  };
+    if (h < 20) return { t:'#a82c18', b:'#5a1845', stars:false, phase:'sunset'  };
+    if (h < 21) return { t:'#180a38', b:'#241248', stars:true,  phase:'dusk'    };
+    return             { t:'#03030e', b:'#07071a', stars:true,  phase:'night'   };
+  }
+
+  /* Combined sky + weather → { grad, stars, phase, overlay } */
+  function _skyForHourCat(h, cat) {
+    var sky = _baseSky(h);
+    var night = sky.stars;
+
+    if (cat === 'storm') {
+      return { grad:'linear-gradient(180deg,#050c08 0%,#0c160e 60%,#101408 100%)',
+               stars:false, phase:'storm', overlay:'storm' };
+    }
+    if (cat === 'rain-heavy') {
+      return { grad: night
+        ? 'linear-gradient(180deg,#07091a 0%,#0e1228 100%)'
+        : 'linear-gradient(180deg,#2e4458 0%,#3e5868 100%)',
+               stars:false, phase:sky.phase, overlay:'rain-heavy' };
+    }
+    if (cat === 'rain-light') {
+      return { grad: night
+        ? 'linear-gradient(180deg,#0a0c20 0%,#121828 100%)'
+        : 'linear-gradient(180deg,#486078 0%,#607888 100%)',
+               stars:false, phase:sky.phase, overlay:'rain-light' };
+    }
+    if (cat === 'overcast') {
+      return { grad: night
+        ? 'linear-gradient(180deg,#111420 0%,#181c28 100%)'
+        : 'linear-gradient(180deg,#5c6878 0%,#788494 100%)',
+               stars:false, phase:sky.phase, overlay:'overcast' };
+    }
+    if (cat === 'snow') {
+      return { grad: night
+        ? 'linear-gradient(180deg,#131828 0%,#1c2238 100%)'
+        : 'linear-gradient(180deg,#849ab0 0%,#a8bece 100%)',
+               stars:false, phase:sky.phase, overlay:'snow' };
+    }
+    if (cat === 'fog') {
+      return { grad:'linear-gradient(180deg,#8898a8 0%,#aab8c4 100%)',
+               stars:false, phase:sky.phase, overlay:'fog' };
+    }
+    /* partly-cloudy / sunny / clear */
+    return { grad:'linear-gradient(180deg,' + sky.t + ' 0%,' + sky.b + ' 100%)',
+             stars:sky.stars, phase:sky.phase, overlay:cat };
+  }
+
+  function _injectColStyles() {
+    if (document.getElementById('wfx-col-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'wfx-col-styles';
+    s.textContent = `
+      /* Column wrap */
+      .wfx-col-wrap { position: relative !important; }
+      .wfx-col-wrap > *:not(.wfx-day-bg) { position: relative; z-index: 1; }
+
+      /* Sky background */
+      .wfx-day-bg {
+        position: absolute; inset: 0; z-index: 0;
+        pointer-events: none; overflow: hidden;
+        transition: background 3s ease;
+      }
+
+      /* ── Stars ── */
+      .wfx-star {
+        position: absolute; border-radius: 50%; background: #fff;
+        animation: wfxs-twinkle var(--wst,3s) ease-in-out infinite;
+        animation-delay: var(--wsd,0s);
+        opacity: var(--wso,.7);
+      }
+      @keyframes wfxs-twinkle {
+        0%,100% { opacity: var(--wso,.7); transform:scale(1);   }
+        50%      { opacity: .15;           transform:scale(.55); }
+      }
+
+      /* ── Moon ── */
+      .wfx-moon {
+        position: absolute; top: 14px; right: 22px;
+        width: 22px; height: 22px; border-radius: 50%;
+        background: radial-gradient(circle at 36% 33%,#fffce0 0%,#f2e080 55%,#d4b848 100%);
+        box-shadow:
+          inset -3px -2px 6px rgba(130,100,0,.40),
+          inset  2px  2px 4px rgba(255,255,220,.85),
+          0 0 0 1.5px rgba(240,220,70,.55),
+          0 0 14px 4px rgba(220,195,50,.38);
+        animation: wfxs-moon 7s ease-in-out infinite;
+      }
+      @keyframes wfxs-moon {
+        0%,100% { box-shadow: inset -3px -2px 6px rgba(130,100,0,.40), inset 2px 2px 4px rgba(255,255,220,.85), 0 0 0 1.5px rgba(240,220,70,.55), 0 0 14px 4px rgba(220,195,50,.38); }
+        50%      { box-shadow: inset -3px -2px 6px rgba(130,100,0,.40), inset 2px 2px 4px rgba(255,255,220,.85), 0 0 0 1.5px rgba(240,220,70,.75), 0 0 26px 8px rgba(220,195,50,.55); }
+      }
+
+      /* ── Horizon (dawn / dusk / sunset) ── */
+      .wfx-horizon {
+        position: absolute; bottom: 0; left: 0; right: 0; height: 30%;
+        pointer-events: none;
+      }
+
+      /* ── CSS Rain (light) ── */
+      .wfx-day-rain {
+        position: absolute; inset: 0; pointer-events: none;
+        background-image: repeating-linear-gradient(
+          170deg,
+          transparent 0px 3px,
+          rgba(160,200,255,.22) 3px 4px,
+          transparent 4px 20px
+        );
+        background-size: 18px 55px;
+        animation: wfxs-rain .38s linear infinite;
+      }
+      @keyframes wfxs-rain { to { background-position: -5px 55px; } }
+
+      /* ── CSS Rain (heavy) ── */
+      .wfx-day-rain-hv {
+        position: absolute; inset: 0; pointer-events: none;
+        background-image:
+          repeating-linear-gradient(168deg,transparent 0px 2px,rgba(140,185,255,.32) 2px 3.5px,transparent 3.5px 12px),
+          repeating-linear-gradient(172deg,transparent 0px 3px,rgba(160,200,255,.18) 3px 4.5px,transparent 4.5px 18px);
+        background-size: 13px 38px, 22px 55px;
+        animation: wfxs-rain-hv .22s linear infinite;
+      }
+      @keyframes wfxs-rain-hv { to { background-position: -4px 38px, -7px 55px; } }
+
+      /* ── CSS Snow ── */
+      .wfx-day-snow {
+        position: absolute; inset: 0; pointer-events: none;
+        background-image:
+          radial-gradient(circle, rgba(255,255,255,.70) 1.5px, transparent 1.5px),
+          radial-gradient(circle, rgba(255,255,255,.45) 1px,   transparent 1px);
+        background-size: 24px 24px, 18px 18px;
+        background-position: 0 0, 9px 9px;
+        animation: wfxs-snow 5s linear infinite;
+      }
+      @keyframes wfxs-snow { to { background-position: 6px 24px, 15px 33px; } }
+
+      /* ── Lightning (re-use existing .wfx-lightning keyframes) ── */
+      .wfx-day-lightning {
+        position: absolute; inset: 0; pointer-events: none;
+        background: rgba(175,200,255,.58); opacity: 0;
+        animation: wfx-flash 3.8s ease-in-out infinite;
+        animation-delay: var(--wfx-ld,0s);
+      }
+
+      /* ── CSS fog bands in column ── */
+      .wfx-day-fog-band {
+        position: absolute; left: -12%; right: -12%; height: 22px;
+        top: var(--ft,30%);
+        background: linear-gradient(90deg,transparent 0%,rgba(200,218,238,.88) 20%,rgba(215,228,245,.92) 50%,rgba(200,218,238,.88) 80%,transparent 100%);
+        filter: blur(6px); opacity: var(--fo,.48);
+        animation: wfx-fog-drift var(--fd,9s) ease-in-out infinite;
+        animation-delay: var(--fdl,0s);
+      }
+
+      /* ── Small sun / sun-peek for daytime in column ── */
+      .wfx-day-sun {
+        position: absolute; top: 16px; right: 20px; z-index: 1;
+      }
+      .wfx-day-sun .wfx-sun-disc  { position:relative; top:0; right:0; width:24px; height:24px; }
+      .wfx-day-sun .wfx-sun-ring  { position:relative; top:-30px; right:-11px; width:36px; height:36px; }
+      .wfx-day-sun .wfx-sun-spikes{ position:relative; top:-86px; right:-2px;  width:58px; height:58px; }
+
+      /* ── Overcast sky overlay ── */
+      .wfx-day-overcast-tint {
+        position: absolute; inset: 0; pointer-events: none;
+        background: rgba(60,70,85,.22);
+      }
+
+      /* ── Column cloud groups (smaller, spread vertically) ── */
+      .wfx-col-clouds {
+        position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function _addStars(container, n) {
+    for (var i = 0; i < n; i++) {
+      var el = document.createElement('div');
+      var sz = .7 + Math.random() * 1.6;
+      el.className = 'wfx-star';
+      el.style.cssText = 'width:' + sz + 'px;height:' + sz + 'px;'
+        + 'top:'  + (Math.random() * 82) + '%;'
+        + 'left:' + (Math.random() * 88) + '%;'
+        + '--wso:' + (.35 + Math.random() * .6) + ';'
+        + '--wst:' + (2 + Math.random() * 4).toFixed(1) + 's;'
+        + '--wsd:' + (-Math.random() * 5).toFixed(1) + 's;';
+      container.appendChild(el);
+    }
+  }
+
+  function _colCloudHTML(top, left, scale, dur, delay, grey) {
+    return '<div class="wfx-cg' + (grey ? ' wfx-cg-grey' : '') + '" style="'
+      + '--ct:' + top  + ';--cl:' + left + ';--cs:' + scale + ';'
+      + '--cd:'  + dur + ';--cdl:' + delay + '">'
+      + '<div class="wfx-p wfx-pb"></div>'
+      + '<div class="wfx-p wfx-pl"></div>'
+      + '<div class="wfx-p wfx-pt"></div>'
+      + '<div class="wfx-p wfx-pr"></div>'
+      + '</div>';
+  }
+
+  async function _applyTodayColumnEffect() {
+    _injectColStyles();
+
+    var today   = _todayStr();
+    var hour    = new Date().getHours();
+    var calBody = document.getElementById('calendar-body');
+    if (!calBody) return;
+
+    /* Find today's column — try common data-attribute patterns */
+    var col = calBody.querySelector(
+      '[data-date="' + today + '"], [data-date-key="' + today + '"]'
+    );
+    if (!col) return;
+
+    /* Clear previous effect */
+    var prev = col.querySelector('.wfx-day-bg');
+    if (prev) prev.remove();
+    col.classList.add('wfx-col-wrap');
+
+    /* Fetch current hour weathercode */
+    var code = 0;
+    try {
+      var hData = await fetchHourly(today);
+      var idx = hData.hourly.time.findIndex(function(t) {
+        return parseInt(t.slice(11, 13), 10) === hour;
+      });
+      if (idx >= 0 && hData.hourly.weathercode[idx] != null) {
+        code = hData.hourly.weathercode[idx];
+      }
+    } catch (err) {
+      console.warn('[WeatherCol]', err);
+    }
+
+    var cat = effectCategory(code);
+    var sky = _skyForHourCat(hour, cat);
+
+    /* ── Background div ── */
+    var bg = document.createElement('div');
+    bg.className = 'wfx-day-bg';
+    bg.style.background = sky.grad;
+    col.insertBefore(bg, col.firstChild);
+
+    /* ── Stars + Moon (night / dusk) ── */
+    if (sky.stars) {
+      _addStars(bg, 30);
+      if (cat !== 'storm' && cat !== 'rain-heavy' && cat !== 'rain-light') {
+        var moon = document.createElement('div');
+        moon.className = 'wfx-moon';
+        bg.appendChild(moon);
+      }
+    }
+
+    /* ── Horizon glow (dawn, sunrise, golden hour, sunset, dusk) ── */
+    var p = sky.phase;
+    if (p === 'dawn' || p === 'sunrise' || p === 'golden' || p === 'sunset' || p === 'dusk') {
+      var hz = document.createElement('div');
+      hz.className = 'wfx-horizon';
+      var warm = p === 'dawn' || p === 'sunrise' || p === 'golden';
+      hz.style.background = warm
+        ? 'linear-gradient(0deg,rgba(255,130,25,.55) 0%,rgba(255,90,15,.22) 45%,transparent 100%)'
+        : 'linear-gradient(0deg,rgba(200,45,15,.58) 0%,rgba(140,30,55,.28) 48%,transparent 100%)';
+      bg.appendChild(hz);
+    }
+
+    /* ── Daytime sun disc (sunny / partly-cloudy) ── */
+    if (!sky.stars && (cat === 'sunny' || cat === 'partly-cloudy') && p !== 'sunset' && p !== 'golden') {
+      var sunWrap = document.createElement('div');
+      sunWrap.className = 'wfx-day-sun';
+      sunWrap.innerHTML = [
+        '<div class="wfx-sun-spikes"></div>',
+        '<div class="wfx-sun-ring"></div>',
+        '<div class="wfx-sun-disc"></div>',
+      ].join('');
+      bg.appendChild(sunWrap);
+    }
+
+    /* ── Weather overlays ── */
+    var ov = sky.overlay;
+
+    if (ov === 'rain-light') {
+      var r = document.createElement('div'); r.className = 'wfx-day-rain'; bg.appendChild(r);
+    }
+    if (ov === 'rain-heavy') {
+      var rh = document.createElement('div'); rh.className = 'wfx-day-rain-hv'; bg.appendChild(rh);
+    }
+    if (ov === 'storm') {
+      var rs = document.createElement('div'); rs.className = 'wfx-day-rain-hv'; bg.appendChild(rs);
+      var fl = document.createElement('div');
+      fl.className = 'wfx-day-lightning';
+      fl.style.setProperty('--wfx-ld', (Math.random() * 2).toFixed(1) + 's');
+      bg.appendChild(fl);
+    }
+    if (ov === 'snow') {
+      var sn = document.createElement('div'); sn.className = 'wfx-day-snow'; bg.appendChild(sn);
+    }
+    if (ov === 'fog') {
+      ['10%','30%','52%','72%','90%'].forEach(function(ft, i) {
+        var fb = document.createElement('div'); fb.className = 'wfx-day-fog-band';
+        fb.style.cssText = '--ft:' + ft + ';--fo:' + (.55 - i*.06) + ';--fd:' + (6+i*2) + 's;--fdl:-' + (i*1.8) + 's;';
+        bg.appendChild(fb);
+      });
+    }
+    if (ov === 'overcast') {
+      var ot = document.createElement('div'); ot.className = 'wfx-day-overcast-tint'; bg.appendChild(ot);
+    }
+
+    /* ── 3D cloud groups in column ── */
+    if (ov === 'partly-cloudy' || ov === 'overcast') {
+      var cc = document.createElement('div'); cc.className = 'wfx-col-clouds'; bg.appendChild(cc);
+      var grey = ov === 'overcast';
+      /* Spread clouds vertically across the full column */
+      cc.innerHTML = [
+        _colCloudHTML('2%',  '5%',  1.15, '18s', '0s',    grey),
+        _colCloudHTML('14%', '48%', 0.85, '22s', '-6s',   grey),
+        _colCloudHTML('26%', '15%', 0.70, '26s', '-12s',  grey),
+        _colCloudHTML('40%', '55%', 0.95, '20s', '-4s',   grey),
+        _colCloudHTML('54%', '8%',  0.80, '24s', '-9s',   grey),
+        _colCloudHTML('66%', '42%', 0.65, '28s', '-15s',  grey),
+        _colCloudHTML('78%', '22%', 0.90, '19s', '-7s',   grey),
+      ].join('');
+    }
+  }
+
   function _observeCalendar() {
     var calHeader = document.getElementById('calendar-header');
-    if (!calHeader) return;
-    new MutationObserver(function() {
+    var calBody   = document.getElementById('calendar-body');
+
+    var onHeaderChange = function() {
       clearTimeout(_debounceTimer);
-      _debounceTimer = setTimeout(_applyHeaderEffects, 300);
-    }).observe(calHeader, { childList: true });
+      _debounceTimer = setTimeout(function() {
+        _applyHeaderEffects();
+        _applyTodayColumnEffect();
+      }, 300);
+    };
+
+    if (calHeader) new MutationObserver(onHeaderChange).observe(calHeader, { childList: true });
+    if (calBody)   new MutationObserver(onHeaderChange).observe(calBody,   { childList: true });
   }
 
   /* ══════════════════════════════════════════════
@@ -708,6 +1061,7 @@ window.CalApp.WeatherModal = (function () {
 
     /* Apply weather effects to headers, then watch for week changes */
     _applyHeaderEffects();
+    _applyTodayColumnEffect();
     _observeCalendar();
   }
 
