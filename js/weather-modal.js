@@ -755,7 +755,7 @@ window.CalApp.WeatherModal = (function () {
     s.id = 'wfx-col-styles';
     s.textContent = `
       /* Column wrap */
-      .wfx-col-wrap { position: relative !important; }
+      .wfx-col-wrap { position: relative !important; overflow: hidden; }
       /* Suppress ::before solid fill so wfx-day-bg sky shows through */
       .wfx-col-wrap::before { background: transparent !important; border-color: transparent !important; }
 
@@ -763,7 +763,6 @@ window.CalApp.WeatherModal = (function () {
       .wfx-day-bg {
         position: absolute; inset: 0; z-index: 1;
         pointer-events: none; overflow: hidden;
-        border-radius: inherit;
         transition: background 3s ease;
       }
 
@@ -945,6 +944,15 @@ window.CalApp.WeatherModal = (function () {
     var bg = document.createElement('div');
     bg.className = 'wfx-day-bg';
     bg.style.background = sky.grad;
+
+    /* Aplicar border-radius explícito — "inherit" falla porque el radio está en ::before */
+    var colStyle = window.getComputedStyle(col);
+    var br = colStyle.borderRadius;
+    if (!br || br === '0px') {
+      var refHeader = document.querySelector('[data-date="' + today + '"].cal-day-header, .cal-day-header[data-date="' + today + '"]');
+      if (refHeader) br = window.getComputedStyle(refHeader).borderRadius;
+    }
+    if (br && br !== '0px') bg.style.borderRadius = br;
     if (sky.stars) bg.dataset.night = '1';   /* flag for canvas rain opacity */
     col.insertBefore(bg, col.firstChild);
 
