@@ -756,11 +756,12 @@ window.CalApp.WeatherModal = (function () {
     s.textContent = `
       /* Column wrap */
       .wfx-col-wrap { position: relative !important; }
-      /* bg sits behind everything via z-index:-1 — no need to touch child positioning */
+      /* Suppress ::before solid fill so wfx-day-bg sky shows through */
+      .wfx-col-wrap::before { background: transparent !important; border-color: transparent !important; }
 
       /* Sky background */
       .wfx-day-bg {
-        position: absolute; inset: 0; z-index: -1;
+        position: absolute; inset: 0; z-index: 1;
         pointer-events: none; overflow: hidden;
         transition: background 3s ease;
       }
