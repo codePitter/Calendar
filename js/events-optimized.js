@@ -329,10 +329,10 @@ window.CalApp.Events = (function () {
     ).join('');
 
     container.innerHTML = `
-      <div class="img-picker-layout img-picker-layout--single">
+      <div class="img-picker-layout" style="display:flex;gap:12px;align-items:flex-start;">
 
-        <!-- ── Única columna: todos los controles ── -->
-        <div class="img-picker-left">
+        <!-- ── Columna izquierda: controles (scrolleable) ── -->
+        <div class="img-picker-left" style="flex:1;min-width:0;overflow-y:auto;max-height:420px;padding-right:4px;">
           <div class="img-recents-section" id="img-recents-section" style="display:none">
             <div class="img-recents-label">🕐 Recientes</div>
             <div class="img-recents-grid" id="img-recents-grid"></div>
@@ -378,6 +378,26 @@ window.CalApp.Events = (function () {
               ${frameDotsHTML}
             </div>
           </div>
+        </div>
+
+        <!-- ── Columna derecha: preview sticky + grilla ── -->
+        <div class="img-picker-right" style="width:260px;flex-shrink:0;position:sticky;top:0;align-self:flex-start;">
+
+          <!-- Preview: oculto hasta que haya imagen seleccionada -->
+          <div id="img-preview-panel"
+               style="display:none;border-radius:10px;overflow:hidden;
+                      background:#f4f4f5;border:1px solid #e5e7eb;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:6px 10px;border-bottom:1px solid #e5e7eb;background:#fff;">
+              <span style="font-size:11px;font-weight:600;color:#888;
+                           text-transform:uppercase;letter-spacing:.04em;">Vista previa</span>
+              <button type="button" id="img-preview-close"
+                      style="background:none;border:none;cursor:pointer;font-size:13px;
+                             color:#aaa;padding:0;line-height:1;" aria-label="Cerrar">✕</button>
+            </div>
+            <img id="img-preview-img" class="img-preview-img" alt="Vista previa"
+                 style="width:100%;height:auto;max-height:240px;object-fit:contain;display:block;">
+          </div>
 
           <!-- Grilla de imágenes web -->
           <div class="img-grid-wrap">
@@ -387,9 +407,6 @@ window.CalApp.Events = (function () {
 
       </div>
     `;
-
-    // Panel flotante independiente (fuera del modal)
-    _buildFloatingPreview();
 
     // Frame color palette listener — sincroniza con _selectedColor
     container.querySelector('#img-frame-palette').addEventListener('click', e => {
@@ -794,110 +811,28 @@ window.CalApp.Events = (function () {
     await _imgConvertPromise;
   }
 
-  /* ── Floating preview panel (independiente del modal) ───── */
-
-  function _buildFloatingPreview() {
-    // Reusar si ya existe (modal puede abrirse múltiples veces)
-    if (document.getElementById('img-float-preview')) return;
-
-    const panel = document.createElement('div');
-    panel.id = 'img-float-preview';
-    panel.innerHTML = `
-      <div class="img-float-header">
-        <span class="img-float-label">Vista previa</span>
-        <button type="button" class="img-float-close" id="img-float-close" aria-label="Cerrar preview">✕</button>
-      </div>
-      <div class="img-float-body">
-        <img id="img-preview-img" class="img-preview-img" alt="Vista previa">
-      </div>
-    `;
-
-    // Estilos del panel flotante inline para no depender del CSS externo
-    Object.assign(panel.style, {
-      position:     'fixed',
-      bottom:       '90px',
-      right:        '24px',
-      width:        '220px',
-      background:   '#fff',
-      borderRadius: '12px',
-      boxShadow:    '0 8px 32px rgba(0,0,0,0.22)',
-      overflow:     'hidden',
-      display:      'none',        // oculto hasta que haya imagen
-      zIndex:       '10001',
-      border:       '1px solid rgba(0,0,0,0.08)',
-      transition:   'opacity .2s, transform .2s',
-    });
-
-    // Header
-    const header = panel.querySelector('.img-float-header');
-    Object.assign(header.style, {
-      display:        'flex',
-      alignItems:     'center',
-      justifyContent: 'space-between',
-      padding:        '8px 10px 6px',
-      borderBottom:   '1px solid #f0f0f0',
-    });
-    const label = panel.querySelector('.img-float-label');
-    Object.assign(label.style, {
-      fontSize:   '11px',
-      fontWeight: '600',
-      color:      '#888',
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em',
-    });
-    const closeBtn = panel.querySelector('#img-float-close');
-    Object.assign(closeBtn.style, {
-      background: 'none',
-      border:     'none',
-      cursor:     'pointer',
-      fontSize:   '13px',
-      color:      '#aaa',
-      lineHeight: '1',
-      padding:    '0',
-    });
-    closeBtn.addEventListener('click', () => {
-      // Quitar solo cerrar el preview sin borrar la imagen seleccionada
-      panel.style.display = 'none';
-    });
-
-    // Body / imagen
-    const body = panel.querySelector('.img-float-body');
-    Object.assign(body.style, {
-      width:    '100%',
-      maxHeight: '260px',
-      overflow: 'hidden',
-      display:  'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f8f8f8',
-    });
-    const img = panel.querySelector('#img-preview-img');
-    Object.assign(img.style, {
-      width:     '100%',
-      height:    'auto',
-      maxHeight: '260px',
-      objectFit: 'contain',
-      display:   'block',
-    });
-
-    document.body.appendChild(panel);
-  }
-
-  /* ── Update image preview (panel flotante) ───────────────── */
+  /* ── Update image preview panel (columna derecha, sticky) ── */
 
   function _updateImagePreview(url) {
-    const panel = document.getElementById('img-float-preview');
-    const img   = document.getElementById('img-preview-img');
-    if (!panel || !img) return;
+    const previewPanel = document.getElementById('img-preview-panel');
+    const previewImg   = document.getElementById('img-preview-img');
+    if (!previewPanel || !previewImg) return;
 
     if (url) {
-      img.src           = url;
-      panel.style.display  = 'block';
-      panel.style.opacity  = '1';
-      panel.style.transform = 'translateY(0)';
+      previewImg.src             = url;
+      previewPanel.style.display = 'block';
+
+      // Listener para botón cerrar preview (sin quitar imagen)
+      const closeBtn = document.getElementById('img-preview-close');
+      if (closeBtn && !closeBtn._bound) {
+        closeBtn._bound = true;
+        closeBtn.addEventListener('click', () => {
+          previewPanel.style.display = 'none';
+        });
+      }
     } else {
-      img.src           = '';
-      panel.style.display  = 'none';
+      previewImg.src             = '';
+      previewPanel.style.display = 'none';
     }
   }
 
@@ -1020,9 +955,6 @@ window.CalApp.Events = (function () {
     $backdrop.hidden = true;
     _currentEvent = null;
     clearImage();
-    // Ocultar panel flotante al cerrar el modal
-    const floatPanel = document.getElementById('img-float-preview');
-    if (floatPanel) floatPanel.style.display = 'none';
   }
 
   /* ── Save event ────────────────────────────────────────── */
