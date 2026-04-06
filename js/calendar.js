@@ -1,11 +1,18 @@
-**
+/**
  * calendar.js — Lógica de renderizado del calendario.
  * Namespace global: window.CalApp.Calendar
  */
 window.CalApp = window.CalApp || {};
 
 window.CalApp.Calendar = (function () {
-  const { CONFIG, State } = window.CalApp;
+  // Acceso diferido: CONFIG y State se resuelven en tiempo de ejecución,
+  // no al cargar el script, para evitar que fallen si aún no están definidos.
+  function _cfg()   { return window.CalApp.CONFIG; }
+  function _state() { return window.CalApp.State;  }
+
+  // Alias de conveniencia (equivalen al destructuring original, pero seguros)
+  const CONFIG = new Proxy({}, { get: (_, k) => _cfg()[k]   });
+  const State  = new Proxy({}, { get: (_, k) => _state()[k] });
 
   /* ── Estado interno del módulo ────────────────────────────── */
 
@@ -42,16 +49,16 @@ window.CalApp.Calendar = (function () {
     try {
       const url = `https://api.open-meteo.com/v1/forecast`
         + `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}`
-        + `&daily=weathercode,temperature_2m_max,temperature_2m_min`
+        + `&daily=weather_code,temperature_2m_max,temperature_2m_min`
         + `&timezone=America%2FArgentina%2FBuenos_Aires`
         + `&forecast_days=16`;
       const res  = await fetch(url);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      const { time, weathercode, temperature_2m_max } = data.daily;
+      const { time, weather_code, temperature_2m_max } = data.daily;
       for (let i = 0; i < time.length; i++) {
         _weatherCache[time[i]] = {
-          emoji:   _wmoEmoji(weathercode[i]),
+          emoji:   _wmoEmoji(weather_code[i]),
           maxTemp: Math.round(temperature_2m_max[i]),
         };
       }
@@ -392,23 +399,27 @@ window.CalApp.Calendar = (function () {
 
   window.addEventListener('resize', _syncHeaderScrollbar);
 
+  let _timeLineInterval = null;
+
   function render() {
     renderHeader();
     renderBody();
     _fetchWeather();
-    // Sincronizar en el mismo tick y luego otra vez tras el primer paint
-    // (el scrollbar puede aparecer después de que el DOM se pinte).
     _syncHeaderScrollbar();
     requestAnimationFrame(_syncHeaderScrollbar);
-  }
 
-  setInterval(updateCurrentTimeLine, 30_000);
+    // Fix 3: iniciar el intervalo recién cuando el DOM ya existe,
+    // y evitar duplicados si render() se llama más de una vez.
+    if (!_timeLineInterval) {
+      _timeLineInterval = setInterval(updateCurrentTimeLine, 30_000);
+    }
+  }
 
   /* ── Day Marker Popover ───────────────────────────────────── */
 
   let _dmPopover        = null;
   let _dmCurrentDateKey = null;
-  let _dmSelectedColor  = CONFIG.COLORS[0];
+  let _dmSelectedColor  = null; // se inicializa en _openDM cuando CONFIG ya está disponible
   let _dmInited         = false;
 
   const DM_PRESETS = [
