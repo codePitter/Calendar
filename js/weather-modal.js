@@ -606,8 +606,17 @@ window.CalApp.WeatherModal = (function () {
       }
 
       /* ══════════════════════════════════════════════
-         🌧️ / ⛈️ / ❄️  precipitation sky tints
+         🌧️ / ⛈️ / ❄️  precipitation sky backgrounds
          ══════════════════════════════════════════════ */
+
+      /* Cielos opacos por categoria (clase aplicada automaticamente al layer) */
+      .wfx-rain-light { background: linear-gradient(180deg,#486078 0%,#607888 100%); }
+      .wfx-rain-heavy { background: linear-gradient(180deg,#2e4458 0%,#3e5868 100%); }
+      .wfx-storm      { background: linear-gradient(180deg,#0e1214 0%,#151a1c 100%); }
+      .wfx-snow       { background: linear-gradient(180deg,#849ab0 0%,#a8bece 100%); }
+      .wfx-fog        { background: linear-gradient(180deg,#8898a8 0%,#aab8c4 100%); }
+
+      /* Overlay semitransparente adicional sobre los cielos de lluvia/tormenta/nieve */
       .wfx-sky-rain::before, .wfx-sky-storm::before, .wfx-sky-snow::before {
         content: ''; position: absolute; inset: 0;
       }
