@@ -675,8 +675,9 @@ window.CalApp.WeatherModal = (function () {
 
     cols.forEach(function(col) {
       var dateStr = col.dataset.dateKey || col.dataset.date;
-      if (!dateStr || codemap[dateStr] == null) return;
-      _buildOverlay(effectCategory(codemap[dateStr]), col);
+      if (!dateStr) return;
+      var code = codemap[dateStr] != null ? codemap[dateStr] : 0; // 0 = despejado como fallback
+      _buildOverlay(effectCategory(code), col);
     });
   }
 
