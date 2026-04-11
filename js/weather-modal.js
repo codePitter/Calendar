@@ -417,6 +417,8 @@ window.CalApp.WeatherModal = (function () {
     headerEl.insertBefore(layer, headerEl.firstChild);
 
     if (cat === 'rain-light') {
+      layer.style.background = 'linear-gradient(180deg,#486078 0%,#607888 100%)';
+      layer.classList.add('wfx-sky-rain');
       _attachCanvas(layer, 'rain', false);
     } else if (cat === 'rain-heavy') {
       layer.classList.add('wfx-sky-rain');
